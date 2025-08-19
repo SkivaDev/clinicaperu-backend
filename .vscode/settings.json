@@ -1,6 +1,7 @@
 {
     "material-icon-theme.activeIconPack": "nest",
     "conventionalCommits.scopes": [
-        "project"
+        "project",
+        "deps"
     ]
 }
