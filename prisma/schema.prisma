@@ -18,12 +18,23 @@ enum Role {
   PATIENT
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 model User {
   id           String   @id @default(uuid())
+  dni          String   @unique
   email        String   @unique
   passwordHash String
-  firstName    String
-  lastName     String
+  names        String
+  fatherSurname String
+  motherSurname String
+  dayOfBirth   DateTime
+  phone        String?
+  gender       Gender
+  
   role         Role     @default(PATIENT)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
