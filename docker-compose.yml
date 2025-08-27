@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: skivadev
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: clinica-peru-db
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    ports:
+      - 5435:5432
