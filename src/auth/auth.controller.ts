@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -12,6 +13,7 @@ import { RegisterDto } from 'src/auth/dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser } from './types/user-without-password';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -51,6 +53,16 @@ export class AuthController {
           motherSurname: req.user.motherSurname,
         },
       },
+    };
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Request() req) {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Perfil obtenido correctamente',
+      data: req.user,
     };
   }
 }

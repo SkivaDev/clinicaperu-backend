@@ -87,6 +87,7 @@ export class AuthService {
         sub: user.id,
         email: user.email,
         dni: user.dni,
+        role: user.role,
         names: user.names,
         fatherSurname: user.fatherSurname,
         motherSurname: user.motherSurname,
