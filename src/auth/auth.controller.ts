@@ -14,6 +14,10 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser } from './types/user-without-password';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Role } from '@prisma/client';
+import { CurrentUser } from './decorators/user.decorator';
+import { Roles } from './decorators/roles.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -63,6 +67,60 @@ export class AuthController {
       statusCode: HttpStatus.OK,
       message: 'Perfil obtenido correctamente',
       data: req.user,
+    };
+  }
+
+  @Get('admin/dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async getAdminDashboard(@CurrentUser() user: any) {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Dashboard admin',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+        adminFeatures: [
+          'Gestión de usuarios',
+          'Gestión de citas',
+          'Gestión de doctores',
+          'Reportes y estadísticas',
+        ],
+      },
+    };
+  }
+
+  /**
+   * 🔹 DASHBOARD PACIENTE - GET /auth/patient/dashboard
+   * Solo accesible para usuarios con rol PATIENT
+   */
+  @Get('patient/dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PATIENT)
+  async getPatientDashboard(@CurrentUser() user: any) {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Dashboard patient',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+        patientFeatures: [
+          'Mis citas',
+          'Reservar cita',
+          'Historial médico',
+          'Perfil personal',
+        ],
+      },
     };
   }
 }

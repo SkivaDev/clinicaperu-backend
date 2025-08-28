@@ -7,9 +7,16 @@ import { PassportModule } from '@nestjs/passport';
 import { LocalStrategy } from './strategies/local.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RolesGuard } from './guards/roles.guard';
 
 @Module({
-  providers: [AuthService, LocalStrategy, JwtStrategy, ConfigService],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+    ConfigService,
+    RolesGuard,
+  ],
   controllers: [AuthController],
   imports: [
     UsersModule,
@@ -23,5 +30,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
     }),
   ],
+  exports: [RolesGuard],
 })
 export class AuthModule {}
