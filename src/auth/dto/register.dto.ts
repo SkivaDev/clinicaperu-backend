@@ -5,12 +5,14 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Length,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
 
 export class RegisterDto {
   @IsString()
   @IsNotEmpty()
+  @Length(8)
   dni: string;
 
   @IsEmail()
