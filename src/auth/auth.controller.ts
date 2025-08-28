@@ -18,6 +18,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from './decorators/user.decorator';
 import { Roles } from './decorators/roles.decorator';
+import type { CurrentUserPayload } from './types/current-user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -73,16 +74,14 @@ export class AuthController {
   @Get('admin/dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async getAdminDashboard(@CurrentUser() user: any) {
+  async getAdminDashboard(@CurrentUser() user: CurrentUserPayload) {
     return {
       statusCode: HttpStatus.OK,
       message: 'Dashboard admin',
       data: {
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          id: user.userId,
+          dni: user.dni,
           role: user.role,
         },
         adminFeatures: [
@@ -102,16 +101,14 @@ export class AuthController {
   @Get('patient/dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.PATIENT)
-  async getPatientDashboard(@CurrentUser() user: any) {
+  async getPatientDashboard(@CurrentUser() user: CurrentUserPayload) {
     return {
       statusCode: HttpStatus.OK,
       message: 'Dashboard patient',
       data: {
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          id: user.userId,
+          dni: user.dni,
           role: user.role,
         },
         patientFeatures: [

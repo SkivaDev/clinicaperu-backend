@@ -19,9 +19,13 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { dni } });
   }
 
-  // findAll() {
-  //   return `This action returns all users`;
-  // }
+  findAll() {
+    return this.prisma.user.findMany();
+  }
+
+  findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
 
   // findOne(id: number) {
   //   return `This action returns a #${id} user`;

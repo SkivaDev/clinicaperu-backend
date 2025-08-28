@@ -3,6 +3,7 @@
     "conventionalCommits.scopes": [
         "project",
         "deps",
-        "auth"
+        "auth",
+        "admin"
     ]
 }
