@@ -16,6 +16,7 @@ datasource db {
 enum Role {
   ADMIN
   PATIENT
+  DOCTOR
 }
 
 enum Gender {
@@ -39,4 +40,62 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // Relación uno a uno si el user es un doctor
+  doctor Doctor?
+}
+
+
+model Clinic {
+  id        String  @id @default(uuid())
+  name      String  @unique
+  address   String
+  ubigeoDept String?
+  ubigeoProv String?
+  ubigeoDist String?
+  phone     String?
+
+  rooms   Room[]
+  doctors Doctor[]
+  @@index([name])
+}
+
+model Room {
+  id       String  @id @default(uuid())
+  clinicId String
+  name     String
+  floor    String?
+
+  clinic   Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  // schedules Schedule[]
+
+  @@unique([clinicId, name])
+}
+
+model Specialty {
+  id    String @id @default(uuid())
+  name  String @unique
+  doctors Doctor[]
+}
+
+model Doctor {
+  id            String    @id @default(uuid())
+  cmp           String    @unique // Código de colegiatura
+  userId        String    @unique   // vínculo con tabla User
+  specialtyId   String
+  clinicId      String
+
+  // Datos laborales del doctor
+  specialty   Specialty @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  clinic      Clinic    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+
+  // Relación con User
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // schedules   Schedule[]
+  // unavail     DoctorUnavailability[]
+  // appointments Appointment[]
+
+  @@index([cmp])
+  @@index([specialtyId, clinicId])
 }

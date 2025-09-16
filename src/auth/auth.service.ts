@@ -9,12 +9,14 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedUser } from './types/user-without-password';
+import { HashingService } from 'src/common/hashing/hashing.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly hashingService: HashingService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<void> {
@@ -31,17 +33,11 @@ export class AuthService {
         throw new ConflictException('DNI already exists');
       }
 
-      const saltRounds = 10;
-      const hashedPassword = (await bcrypt.hash(
-        password,
-        saltRounds,
-      )) as string;
-
       await this.usersService.create({
         dni,
         email,
+        password,
         role: 'PATIENT',
-        passwordHash: hashedPassword,
         ...userData,
       });
     } catch (error) {
@@ -112,7 +108,11 @@ export class AuthService {
       }
 
       // 2. Comparar contraseñas
-      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      const isPasswordValid = await this.hashingService.compare(
+        password,
+        user.passwordHash,
+      );
+
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
       }

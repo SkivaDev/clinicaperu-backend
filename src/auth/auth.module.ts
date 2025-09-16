@@ -8,6 +8,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RolesGuard } from './guards/roles.guard';
+import { HashingModule } from 'src/common/hashing/hashing.module';
 
 @Module({
   providers: [
@@ -21,6 +22,7 @@ import { RolesGuard } from './guards/roles.guard';
   imports: [
     UsersModule,
     PassportModule,
+    HashingModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

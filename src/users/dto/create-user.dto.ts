@@ -1,1 +1,35 @@
-export class CreateUserDto {}
+import { Gender, Role } from '@prisma/client';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+
+export class CreateUserDto {
+  @IsString()
+  dni: string;
+
+  @IsString()
+  email: string;
+
+  @IsString()
+  password: string;
+
+  @IsString()
+  names: string;
+
+  @IsString()
+  fatherSurname: string;
+
+  @IsString()
+  motherSurname: string;
+
+  @IsDateString()
+  dayOfBirth: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsEnum(Gender)
+  gender: Gender;
+
+  @IsEnum(Role)
+  role: Role;
+}
