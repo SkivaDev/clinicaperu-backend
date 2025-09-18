@@ -24,6 +24,22 @@ enum Gender {
   FEMALE
 }
 
+enum SlotStatus {
+  FREE
+  HELD
+  BOOKED
+  BLOCKED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  ATTENDED
+  CANCELLED
+  NO_SHOW
+}
+
+
 model User {
   id           String   @id @default(uuid())
   dni          String   @unique
@@ -43,6 +59,9 @@ model User {
 
   // Relación uno a uno si el user es un doctor
   doctor Doctor?
+
+  // Relación con citas y correos
+  appointments Appointment[]
 }
 
 
@@ -92,10 +111,80 @@ model Doctor {
   // Relación con User
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // schedules   Schedule[]
-  // unavail     DoctorUnavailability[]
-  // appointments Appointment[]
+  // Agenda
+  schedules   Schedule[]
+  unavail     DoctorUnavailability[]
+  appointments Appointment[]
 
   @@index([cmp])
   @@index([specialtyId, clinicId])
+}
+
+model Schedule {
+  id            String   @id @default(uuid())
+  doctorId      String
+  dayOfWeek     Int      // 0=Dom, 6=Sáb
+  startTime     String   // "08:00"
+  endTime       String   // "14:00"
+  slotMinutes   Int
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  isActive      Boolean  @default(true)
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  slots   Slot[]
+
+  @@index([doctorId, dayOfWeek])
+}
+
+model Slot {
+  id            String     @id @default(uuid())
+  scheduleId    String
+  startAt       DateTime
+  endAt         DateTime
+  status        SlotStatus @default(FREE)
+  holdExpiresAt DateTime?
+  createdAt     DateTime   @default(now())
+
+  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  appointment Appointment?
+
+  @@unique([scheduleId, startAt])
+  @@index([status, startAt])
+  @@index([startAt])
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  userId      String            // paciente
+  doctorId    String
+  slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
+  status      AppointmentStatus @default(PENDING)
+  reason      String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+  attendedAt  DateTime?
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
+
+  @@index([doctorId, createdAt])
+  @@index([userId, createdAt])
+  // Extra: índice parcial raw SQL para asegurar única cita por slot activo
+}
+
+model DoctorUnavailability {
+  id        String   @id @default(uuid())
+  doctorId  String
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, startAt, endAt])
 }

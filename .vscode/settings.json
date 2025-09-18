@@ -4,6 +4,7 @@
         "project",
         "deps",
         "auth",
-        "admin"
+        "admin",
+        "db"
     ]
 }
