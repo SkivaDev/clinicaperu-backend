@@ -20,6 +20,7 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { UseGuards } from '@nestjs/common';
+import { DoctorResponseDto } from './dto/doctor-response.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -38,8 +39,8 @@ export class DoctorsController {
   }
 
   @Get()
-  findAll() {
-    const doctors = this.doctorsService.listDoctors();
+  async findAll(): Promise<ResponseDto<DoctorResponseDto[]>> {
+    const doctors = await this.doctorsService.listDoctors();
     return {
       statusCode: HttpStatus.OK,
       message: 'Doctors found successfully',
