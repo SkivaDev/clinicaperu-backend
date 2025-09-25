@@ -1,0 +1,221 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PATIENT
+  DOCTOR
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum SlotStatus {
+  FREE
+  HELD
+  BOOKED
+  BLOCKED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  ATTENDED
+  CANCELLED
+  NO_SHOW
+}
+
+enum RoomType {
+  CONSULTATION
+  SURGERY
+  EMERGENCY
+  ICU
+  LABORATORY
+  RADIOLOGY
+}
+
+model User {
+  id           String   @id @default(uuid())
+  dni          String   @unique
+  email        String   @unique
+  passwordHash String
+  names        String
+  fatherSurname String
+  motherSurname String
+  dayOfBirth   DateTime
+  phone        String?
+  gender       Gender
+  
+  role         Role     @default(PATIENT)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relación uno a uno si el user es un doctor
+  doctor Doctor?
+
+  // Relación con citas y correos
+  appointments Appointment[]
+}
+
+
+model Clinic {
+  id           String  @id @default(uuid())
+  name         String  @unique
+  address      String
+  ubigeoDept   String
+  ubigeoProv   String
+  ubigeoDist   String
+  phone        String?
+  email        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rooms        Room[]
+  doctors      Doctor[]
+  @@index([name])
+}
+
+model Room {
+  id               String  @id @default(uuid())
+  clinicId         String
+  name             String
+  roomNumber       String
+  roomType         RoomType
+  floor            Int
+  capacity         Int
+  isActive         Boolean   @default(true)
+  equipment        String[]  // text[] en Postgres
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, name])
+  @@index([roomType])
+}
+
+model Specialty {
+  id               String @id @default(uuid())
+  name             String @unique
+  description      String?
+  isActive         Boolean @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  doctors          Doctor[]
+}
+
+model Doctor {
+  id            String    @id @default(uuid())
+  cmp           String    @unique // Código de colegiatura
+  userId        String    @unique   // vínculo con tabla User
+  specialtyId   String
+  clinicId      String
+
+
+// Datos profesionales
+  isActive          Boolean  @default(true)
+  yearsOfExperience Int?
+  consultationPrice Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Datos laborales del doctor
+  specialty   Specialty @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  clinic      Clinic    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+
+  // Relación con User
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Agenda
+  schedules   Schedule[]
+  unavail     DoctorUnavailability[]
+  appointments Appointment[]
+
+  @@index([cmp])
+  @@index([specialtyId, clinicId])
+}
+
+model Schedule {
+  id            String   @id @default(uuid())
+  doctorId      String
+  dayOfWeek     Int      // 0=Dom, 6=Sáb
+  startTime     String   // "08:00"
+  endTime       String   // "14:00"
+  slotMinutes   Int
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  isActive      Boolean  @default(true)
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  slots   Slot[]
+
+  @@index([doctorId, dayOfWeek])
+}
+
+model Slot {
+  id            String     @id @default(uuid())
+  scheduleId    String
+  startAt       DateTime
+  endAt         DateTime
+  status        SlotStatus @default(FREE)
+  holdExpiresAt DateTime?
+  createdAt     DateTime   @default(now())
+
+  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  appointment Appointment?
+
+  @@unique([scheduleId, startAt])
+  @@index([status, startAt])
+  @@index([startAt])
+}
+
+model Appointment {
+  id          String            @id @default(uuid())
+  userId      String            // paciente
+  doctorId    String
+  slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
+  status      AppointmentStatus @default(PENDING)
+  reason      String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+  attendedAt  DateTime?
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
+
+  @@index([doctorId, createdAt])
+  @@index([userId, createdAt])
+  // Extra: índice parcial raw SQL para asegurar única cita por slot activo
+}
+
+model DoctorUnavailability {
+  id        String   @id @default(uuid())
+  doctorId  String
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, startAt, endAt])
+}

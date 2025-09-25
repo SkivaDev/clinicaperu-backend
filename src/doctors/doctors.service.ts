@@ -44,9 +44,8 @@ export class DoctorsService {
             dni: dto.dni,
             email: dto.email,
             passwordHash: hashedPassword,
-            names: dto.names,
-            fatherSurname: dto.fatherSurname,
-            motherSurname: dto.motherSurname,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
             dayOfBirth: new Date(dto.dayOfBirth),
             phone: dto.phone,
             gender: dto.gender,
@@ -64,7 +63,7 @@ export class DoctorsService {
         });
 
         //retornar sin el passwordHash
-        const { passwordHash, ...userWithoutPassword } = user;
+        const { passwordHash: _, ...userWithoutPassword } = user;
         return { doctor, user: userWithoutPassword };
       });
 
@@ -78,7 +77,7 @@ export class DoctorsService {
   async getDoctorDetail(id: string) {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id },
-      include: { user: true, clinic: true, specialty: true },
+      include: { user: true, clinic: true, specialty: true, schedules: true },
     });
     if (!doctor) throw new NotFoundException('Doctor not found');
     return doctor;

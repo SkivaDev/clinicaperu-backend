@@ -1,12 +1,16 @@
+import { RoomType } from '@prisma/client';
 import { ClinicResponseDto } from 'src/clinics/dto/clinic-response.dto';
 
 export class RoomResponseDto {
   id: string;
   name: string;
-  floor: string | null;
-  clinic: ClinicResponseDto;
+  roomNumber: string;
+  roomType: RoomType;
+  floor: number;
+  capacity: number;
+  equipment: string[];
+  createdAt: Date;
+  updatedAt: Date;
 
-  constructor(partial: Partial<RoomResponseDto>) {
-    Object.assign(this, partial);
-  }
+  clinic?: ClinicResponseDto;
 }

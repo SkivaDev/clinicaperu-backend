@@ -1,9 +1,23 @@
-import { IsString } from 'class-validator';
+import { RoomType } from '@prisma/client';
+import { IsEnum, IsInt, IsString } from 'class-validator';
 
 export class CreateRoomDto {
   @IsString()
   name: string;
 
   @IsString()
-  floor: string;
+  roomNumber: string;
+
+  @IsString()
+  @IsEnum(RoomType)
+  roomType: RoomType;
+
+  @IsInt()
+  floor: number;
+
+  @IsInt()
+  capacity: number;
+
+  @IsString()
+  equipment: string[];
 }

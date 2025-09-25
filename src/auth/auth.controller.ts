@@ -19,6 +19,7 @@ import { Role } from '@prisma/client';
 import { CurrentUser } from './decorators/user.decorator';
 import { Roles } from './decorators/roles.decorator';
 import type { CurrentUserPayload } from './types/current-user.interface';
+import { first } from 'rxjs';
 
 @Controller('auth')
 export class AuthController {
@@ -53,9 +54,8 @@ export class AuthController {
         user: {
           id: req.user.id,
           email: req.user.email,
-          names: req.user.names,
-          fatherSurname: req.user.fatherSurname,
-          motherSurname: req.user.motherSurname,
+          firstName: req.user.firstName,
+          lastName: req.user.lastName,
         },
       },
     };

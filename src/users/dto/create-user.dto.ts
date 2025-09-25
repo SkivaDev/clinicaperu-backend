@@ -12,13 +12,10 @@ export class CreateUserDto {
   password: string;
 
   @IsString()
-  names: string;
+  firstName: string;
 
   @IsString()
-  fatherSurname: string;
-
-  @IsString()
-  motherSurname: string;
+  lastName: string;
 
   @IsDateString()
   dayOfBirth: string;
@@ -32,4 +29,7 @@ export class CreateUserDto {
 
   @IsEnum(Role)
   role: Role;
+
+  @IsString()
+  profileImage?: string;
 }

@@ -5,6 +5,8 @@
         "deps",
         "auth",
         "admin",
-        "db"
+        "db",
+        "rooms",
+        "specialties"
     ]
 }

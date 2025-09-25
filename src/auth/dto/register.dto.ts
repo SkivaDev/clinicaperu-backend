@@ -21,15 +21,11 @@ export class RegisterDto {
 
   @IsString()
   @IsNotEmpty()
-  names: string;
+  firstName: string;
 
   @IsString()
   @IsNotEmpty()
-  fatherSurname: string;
-
-  @IsString()
-  @IsNotEmpty()
-  motherSurname: string;
+  lastName: string;
 
   @IsString()
   @IsNotEmpty()
@@ -45,6 +41,10 @@ export class RegisterDto {
 
   @IsEnum(Gender)
   gender: Gender;
+
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
 
   //   @IsOptional()
   //   @IsString()

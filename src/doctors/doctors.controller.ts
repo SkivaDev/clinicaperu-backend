@@ -11,7 +11,6 @@ import {
 import { DoctorsService } from './doctors.service';
 import type { CreateDoctorDto } from './dto/create-doctor.dto';
 import type { UpdateDoctorDto } from './dto/update-doctor.dto';
-import { DoctorDetailDto } from './dto/doctor-detail.dto';
 import { ResponseDto } from 'src/common/dto/response.dto';
 import { DoctorIdDto } from './dto/doctor-id.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
@@ -51,7 +50,7 @@ export class DoctorsController {
   @Get(':id')
   async findOne(
     @Param('id') id: string,
-  ): Promise<ResponseDto<DoctorDetailDto>> {
+  ): Promise<ResponseDto<DoctorResponseDto>> {
     const doctor = await this.doctorsService.getDoctorDetail(id);
     return {
       statusCode: HttpStatus.OK,

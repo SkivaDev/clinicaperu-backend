@@ -3,34 +3,28 @@
 import { Doctor, Room } from '@prisma/client';
 
 export class ClinicResponseDto {
-  //   @ApiProperty()
   id: string;
 
-  //   @ApiProperty()
   name: string;
 
-  //   @ApiProperty()
   address: string;
 
-  //   @ApiProperty({ required: false })
-  ubigeoDept: string | null;
+  ubigeoDept: string;
 
-  //   @ApiProperty({ required: false })
-  ubigeoProv: string | null;
+  ubigeoProv: string;
 
-  //   @ApiProperty({ required: false })
-  ubigeoDist: string | null;
+  ubigeoDist: string;
 
-  //   @ApiProperty({ required: false })
   phone: string | null;
 
-  //   @ApiProperty({ type: () => [String] })
+  email: string | null;
+
+  isActive: boolean;
+
+  createdAt: Date;
+  updatedAt: Date;
+
   rooms?: Room[];
 
-  //   @ApiProperty({ type: () => [String] })
   doctors?: Doctor[];
-
-  constructor(partial: Partial<ClinicResponseDto>) {
-    Object.assign(this, partial);
-  }
 }
