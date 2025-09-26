@@ -10,7 +10,7 @@ export class UserResponseDto {
   phone: string | null;
   gender: Gender;
   role: Role;
-  profileImage?: string | null;
+  profileImage: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

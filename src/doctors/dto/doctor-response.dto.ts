@@ -5,13 +5,14 @@ import { UserResponseDto } from 'src/users/dto/user-response.dto';
 
 export class DoctorResponseDto {
   id: string;
-  cmp: string;
+  cmp: number;
 
   isActive: boolean;
   yearsOfExperience?: number | null;
   consultationPrice?: number | null;
   attendedAppointments: number;
   attendedPatients: number;
+  rating: number;
   createdAt: Date;
   updatedAt: Date;
 

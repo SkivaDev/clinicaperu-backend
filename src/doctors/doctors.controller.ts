@@ -23,7 +23,7 @@ import { DoctorResponseDto } from './dto/doctor-response.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('doctors')
+@Controller('admin/doctors')
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
 

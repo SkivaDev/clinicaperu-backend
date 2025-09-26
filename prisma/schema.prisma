@@ -122,7 +122,7 @@ model Specialty {
 
 model Doctor {
   id            String    @id @default(uuid())
-  cmp           String    @unique // Código de colegiatura
+  cmp           Int    @unique // Código de colegiatura
 
   // Datos profesionales
   isActive          Boolean  @default(true)
@@ -130,6 +130,7 @@ model Doctor {
   consultationPrice Float?
   attendedAppointments Int @default(0)
   attendedPatients Int @default(0)
+  rating            Float @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

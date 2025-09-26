@@ -21,7 +21,7 @@ import { Role } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('clinics')
+@Controller('admin/clinics')
 export class ClinicsController {
   constructor(private readonly clinicsService: ClinicsService) {}
 

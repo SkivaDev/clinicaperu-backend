@@ -1,8 +1,8 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class CreateDoctorDto {
-  @IsString()
-  cmp: string;
+  @IsInt()
+  cmp: number;
 
   @IsBoolean()
   @IsOptional()

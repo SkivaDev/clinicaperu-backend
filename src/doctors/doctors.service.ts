@@ -56,6 +56,9 @@ export class DoctorsService {
         const doctor = await tx.doctor.create({
           data: {
             cmp: dto.cmp,
+            isActive: dto.isActive,
+            yearsOfExperience: dto.yearsOfExperience,
+            consultationPrice: dto.consultationPrice,
             clinic: { connect: { id: dto.clinicId } },
             specialty: { connect: { id: dto.specialtyId } },
             user: { connect: { id: user.id } },

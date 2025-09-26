@@ -215,15 +215,16 @@ async function main() {
   });
 
   const doctor1 = await prisma.doctor.upsert({
-    where: { cmp: 'CMP12345' },
+    where: { cmp: 12345 },
     update: {},
     create: {
-      cmp: 'CMP12345',
+      cmp: 12345,
       userId: doctor1User.id,
       clinicId: clinic.id,
       specialtyId: cardiologia.id,
       yearsOfExperience: 15,
       consultationPrice: 150.0,
+      rating: 3.5,
     },
   });
 
@@ -246,15 +247,16 @@ async function main() {
   });
 
   const doctor2 = await prisma.doctor.upsert({
-    where: { cmp: 'CMP67890' },
+    where: { cmp: 67890 },
     update: {},
     create: {
-      cmp: 'CMP67890',
+      cmp: 67890,
       userId: doctor2User.id,
       clinicId: clinic.id,
       specialtyId: pediatria.id,
       yearsOfExperience: 10,
       consultationPrice: 120.0,
+      rating: 4.5,
     },
   });
 
