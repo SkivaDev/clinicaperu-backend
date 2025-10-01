@@ -8,6 +8,7 @@
         "db",
         "rooms",
         "specialties",
-        "doctors"
+        "doctors",
+        "schedules"
     ]
 }

@@ -20,6 +20,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { UseGuards } from '@nestjs/common';
 import { DoctorResponseDto } from './dto/doctor-response.dto';
+import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -28,7 +29,9 @@ export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
 
   @Post()
-  async create(@Body() dto: CreateUserDto & CreateDoctorDto) {
+  async create(
+    @Body() dto: CreateUserDto & CreateDoctorDto,
+  ): Promise<ResponseDto<DoctorResponseDto>> {
     const doctor = await this.doctorsService.createDoctor(dto);
     return {
       statusCode: HttpStatus.OK,
@@ -70,12 +73,37 @@ export class DoctorsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateDoctorDto: UpdateDoctorDto) {
-    return this.doctorsService.updateDoctor(id, updateDoctorDto);
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto & UpdateDoctorDto,
+  ): Promise<ResponseDto<DoctorResponseDto>> {
+    const doctorUpdated = await this.doctorsService.updateDoctor(id, dto);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Doctor updated successfully',
+      data: doctorUpdated,
+    };
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.doctorsService.deleteDoctor(id);
+  async remove(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<DoctorResponseDto>> {
+    const doctorDeleted = await this.doctorsService.deleteDoctor(id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Doctor deleted successfully',
+      data: doctorDeleted,
+    };
   }
+
+  // @Get(':id/schedules')
+  // async getDoctorSchedules(@Param('id') id: string) {
+  //   return this.schedulesService.getDoctorSchedules(id);
+  // }
+
+  // @Patch(':id/schedules')
+  // async updateSchedule(@Param('id') id: string, @Body() dto: UpdateScheduleDto) {
+  //   return this.schedulesService.updateSchedule(id, dto);
+  // }
 }

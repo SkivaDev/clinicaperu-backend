@@ -9,6 +9,7 @@ import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { PrismaService } from 'src/prisma.service';
 import { HashingService } from 'src/common/hashing/hashing.service';
+import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 
 @Injectable()
 export class DoctorsService {
@@ -67,7 +68,7 @@ export class DoctorsService {
 
         //retornar sin el passwordHash
         const { passwordHash: _, ...userWithoutPassword } = user;
-        return { doctor, user: userWithoutPassword };
+        return { ...doctor, user: userWithoutPassword };
       });
 
       return result;
@@ -100,23 +101,79 @@ export class DoctorsService {
     return doctor;
   }
 
-  async updateDoctor(id: string, dto: UpdateDoctorDto) {
-    await this.getDoctorIds(id);
-    return this.prisma.doctor.update({
+  // async updateDoctor(id: string, dto: UpdateDoctorDto) {
+  //   await this.getDoctorIds(id);
+  //   return this.prisma.doctor.update({
+  //     where: { id },
+  //     data: {
+  //       cmp: dto.cmp,
+  //       clinic: dto.clinicId ? { connect: { id: dto.clinicId } } : undefined,
+  //       specialty: dto.specialtyId
+  //         ? { connect: { id: dto.specialtyId } }
+  //         : undefined,
+  //     },
+  //   });
+  // }
+
+  async updateDoctor(id: string, dto: UpdateUserDto & UpdateDoctorDto) {
+    // Verificar existencia
+    const doctor = await this.prisma.doctor.findUnique({
       where: { id },
-      data: {
-        cmp: dto.cmp,
-        clinic: dto.clinicId ? { connect: { id: dto.clinicId } } : undefined,
-        specialty: dto.specialtyId
-          ? { connect: { id: dto.specialtyId } }
-          : undefined,
-      },
+      include: { user: true },
     });
+    if (!doctor) {
+      throw new NotFoundException('Doctor no encontrado');
+    }
+
+    // Si hay password, hashearlo
+    let passwordHash: string | undefined;
+    if (dto.password) {
+      passwordHash = await this.hashingService.hash(dto.password);
+    }
+
+    // Actualizar en transacción
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedUser = await tx.user.update({
+        where: { id: doctor.userId },
+        data: {
+          dni: dto.dni,
+          email: dto.email,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phone: dto.phone,
+          gender: dto.gender,
+          dayOfBirth: dto.dayOfBirth ? new Date(dto.dayOfBirth) : undefined,
+          ...(passwordHash && { passwordHash }),
+        },
+      });
+
+      const updatedDoctor = await tx.doctor.update({
+        where: { id },
+        data: {
+          cmp: dto.cmp,
+          isActive: dto.isActive,
+          yearsOfExperience: dto.yearsOfExperience,
+          consultationPrice: dto.consultationPrice,
+          clinic: dto.clinicId ? { connect: { id: dto.clinicId } } : undefined,
+          specialty: dto.specialtyId
+            ? { connect: { id: dto.specialtyId } }
+            : undefined,
+        },
+      });
+
+      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+      return { ...updatedDoctor, user: userWithoutPassword };
+    });
+
+    return result;
   }
 
   async deleteDoctor(id: string) {
     await this.getDoctorIds(id);
-    return this.prisma.doctor.delete({ where: { id } });
+    return this.prisma.doctor.delete({
+      where: { id },
+      include: { user: true },
+    });
   }
 
   async listDoctors() {

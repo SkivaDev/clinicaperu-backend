@@ -1,34 +1,49 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  // Post,
+  Body,
+  Patch,
+  Param,
+  // Delete,
+  HttpStatus,
+} from '@nestjs/common';
+// import { CreateScheduleDto } from './dto/create-schedule.dto';
+// import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { ScheduleResponseDto } from './dto/schedule-response.dto';
+import { ResponseDto } from 'src/common/dto/response.dto';
+import { UpdateSchedulesDto } from './dto/update-schedule.dto';
 import { SchedulesService } from './schedules.service';
-import { CreateScheduleDto } from './dto/create-schedule.dto';
-import { UpdateScheduleDto } from './dto/update-schedule.dto';
 
-@Controller('schedules')
+@Controller('admin/doctors/:doctorId/schedules')
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
-  @Post()
-  create(@Body() createScheduleDto: CreateScheduleDto) {
-    return this.schedulesService.create(createScheduleDto);
-  }
-
   @Get()
-  findAll() {
-    return this.schedulesService.findAll();
+  async getDoctorSchedules(
+    @Param('doctorId') doctorId: string,
+  ): Promise<ResponseDto<ScheduleResponseDto[]>> {
+    const schedules = await this.schedulesService.getDoctorSchedules(doctorId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Schedules found successfully',
+      data: schedules,
+    };
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.schedulesService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateScheduleDto: UpdateScheduleDto) {
-    return this.schedulesService.update(+id, updateScheduleDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.schedulesService.remove(+id);
+  @Patch()
+  async updateSchedule(
+    @Param('doctorId') doctorId: string,
+    @Body() dto: UpdateSchedulesDto,
+  ): Promise<ResponseDto<ScheduleResponseDto[]>> {
+    const updatedSchedules = await this.schedulesService.updateSchedules(
+      doctorId,
+      dto.schedules,
+    );
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Schedules updated successfully',
+      data: updatedSchedules,
+    };
   }
 }

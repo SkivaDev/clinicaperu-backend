@@ -158,9 +158,9 @@ model Schedule {
   startTime        String   // "08:00"
   endTime          String   // "14:00"
   slotMinutes      Int
+  isActive         Boolean  @default(true)
   effectiveFrom    DateTime?
   effectiveTo      DateTime?
-  isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -174,15 +174,16 @@ model Schedule {
 
 model Slot {
   id            String     @id @default(uuid())
-  scheduleId    String
   startAt       DateTime
   endAt         DateTime
   status        SlotStatus @default(FREE)
   holdExpiresAt DateTime?
   createdAt     DateTime   @default(now())
 
-  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   appointment Appointment?
+
+  scheduleId    String
+  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@unique([scheduleId, startAt])
   @@index([status, startAt])
@@ -191,9 +192,6 @@ model Slot {
 
 model Appointment {
   id          String            @id @default(uuid())
-  userId      String            // paciente
-  doctorId    String
-  slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
   status      AppointmentStatus @default(PENDING)
   reason      String?
   notes       String?
@@ -203,8 +201,11 @@ model Appointment {
   cancelledAt DateTime?
   attendedAt  DateTime?
 
+  userId      String            // paciente
   user    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  doctorId    String
   doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
   slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
 
   @@index([doctorId, createdAt])
@@ -214,11 +215,11 @@ model Appointment {
 
 model DoctorUnavailability {
   id        String   @id @default(uuid())
-  doctorId  String
   startAt   DateTime
   endAt     DateTime
   reason    String?
 
+  doctorId  String
   doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@index([doctorId, startAt, endAt])
