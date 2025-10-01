@@ -10,9 +10,9 @@ export class AppointmentResponseDto {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
-  confirmedAt?: Date;
-  cancelledAt?: Date;
-  attendedAt?: Date;
+  confirmedAt: Date | null;
+  cancelledAt: Date | null;
+  attendedAt: Date | null;
 
   // Papas
   slot?: SlotResponseDto;

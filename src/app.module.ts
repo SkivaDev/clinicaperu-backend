@@ -6,7 +6,7 @@ import { AdminModule } from './admin/admin.module';
 import { SpecialtiesModule } from './specialties/specialties.module';
 import { ClinicsModule } from './clinics/clinics.module';
 import { DoctorsModule } from './doctors/doctors.module';
-// import { AppointmentsModule } from './appointments/appointments.module';
+import { AppointmentsModule } from './appointments/appointments.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { SlotsModule } from './slots/slots.module';
@@ -20,7 +20,7 @@ import { SlotsModule } from './slots/slots.module';
     SpecialtiesModule,
     ClinicsModule,
     DoctorsModule,
-    // AppointmentsModule,
+    AppointmentsModule,
     SchedulesModule,
     RoomsModule,
     SlotsModule,
