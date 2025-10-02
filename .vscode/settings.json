@@ -10,6 +10,7 @@
         "specialties",
         "doctors",
         "schedules",
-        "appointments"
+        "appointments",
+        "calendar"
     ]
 }

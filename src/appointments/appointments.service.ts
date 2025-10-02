@@ -28,7 +28,11 @@ export class AppointmentsService {
   }
 
   async getAllAppointments(): Promise<AppointmentResponseDto[]> {
-    const appointments = await this.prisma.appointment.findMany();
+    const appointments = await this.prisma.appointment.findMany({
+      include: {
+        slot: true,
+      },
+    });
 
     return appointments;
   }
