@@ -3,19 +3,19 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
 } from '@nestjs/common';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { ScheduleResponseDto } from './dto/schedule-response.dto';
 import { PrismaService } from 'src/prisma.service';
-import { SlotResponseDto } from 'src/slots/dto/slot-response.dto';
 import { SlotGeneratorService } from 'src/slots/slot-generator.service';
+import { SlotsService } from 'src/slots/slots.service';
 
 @Injectable()
 export class SchedulesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly slotGenerator: SlotGeneratorService,
+    private readonly slotsService: SlotsService,
   ) {}
 
   private readonly DAY_NAMES = [
@@ -33,13 +33,13 @@ export class SchedulesService {
     schedules: CreateScheduleDto[],
   ): Promise<ScheduleResponseDto[]> {
     // 1. Validación inicial en paralelo
-    const [doctor, hasActiveSchedules] = await Promise.all([
+    await Promise.all([
       this.validateDoctorExists(doctorId),
       this.validateActiveSchedules(schedules),
     ]);
 
     // 2. Validar solapamientos
-    await this.validateNoOverlappingSchedules(schedules);
+    this.validateNoOverlappingSchedules(schedules);
 
     // 3. Transacción para actualizar todo
     return await this.prisma.$transaction(async (tx) => {
@@ -80,9 +80,7 @@ export class SchedulesService {
     return doctor;
   }
 
-  private async validateActiveSchedules(
-    schedules: CreateScheduleDto[],
-  ): Promise<void> {
+  private validateActiveSchedules(schedules: CreateScheduleDto[]): void {
     const activeSchedules = schedules.filter((s) => s.isActive !== false);
 
     if (activeSchedules.length === 0) {
@@ -92,9 +90,7 @@ export class SchedulesService {
     }
   }
 
-  private async validateNoOverlappingSchedules(
-    schedules: CreateScheduleDto[],
-  ): Promise<void> {
+  private validateNoOverlappingSchedules(schedules: CreateScheduleDto[]): void {
     const activeSchedules = schedules.filter((s) => s.isActive !== false);
 
     for (let day = 0; day <= 6; day++) {
@@ -345,5 +341,189 @@ export class SchedulesService {
       heldSlots,
       blockedSlots,
     };
+  }
+
+  /**
+   * Deactivates a specific schedule and its future free slots
+   * This method implements soft deletion without losing historical data
+   */
+  async deactivateSchedule(
+    doctorId: string,
+    scheduleId: string,
+  ): Promise<{
+    scheduleDeactivated: boolean;
+    slotsDeactivated: number;
+    slotsPreserved: number;
+    errors: string[];
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1️⃣ Verify the schedule exists and belongs to the doctor
+      const schedule = await tx.schedule.findUnique({
+        where: { id: scheduleId },
+        select: { id: true, doctorId: true, isActive: true },
+      });
+
+      if (!schedule) {
+        throw new NotFoundException('Schedule not found');
+      }
+
+      if (schedule.doctorId !== doctorId) {
+        throw new BadRequestException(
+          'Schedule does not belong to this doctor',
+        );
+      }
+
+      if (!schedule.isActive) {
+        return {
+          scheduleDeactivated: false,
+          slotsDeactivated: 0,
+          slotsPreserved: 0,
+          errors: ['Schedule is already inactive'],
+        };
+      }
+
+      // 2️⃣ Deactivate the schedule
+      await tx.schedule.update({
+        where: { id: scheduleId },
+        data: { isActive: false },
+      });
+
+      // 3️⃣ Deactivate future free slots for this schedule
+      const slotResult =
+        await this.slotsService.deactivateFutureFreeSlotsForSchedule(
+          tx,
+          scheduleId,
+        );
+
+      return {
+        scheduleDeactivated: true,
+        slotsDeactivated: slotResult.slotsDeactivated,
+        slotsPreserved: slotResult.slotsPreserved,
+        errors: slotResult.errors,
+      };
+    });
+  }
+
+  /**
+   * Reactivates a schedule and regenerates its slots
+   * This method is used when a schedule needs to be reactivated
+   */
+  async reactivateSchedule(
+    doctorId: string,
+    scheduleId: string,
+  ): Promise<{
+    scheduleReactivated: boolean;
+    slotsReactivated: number;
+    slotsGenerated: number;
+    errors: string[];
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1️⃣ Verify the schedule exists and belongs to the doctor
+      const schedule = await tx.schedule.findUnique({
+        where: { id: scheduleId },
+        select: { id: true, doctorId: true, isActive: true },
+      });
+
+      if (!schedule) {
+        throw new NotFoundException('Schedule not found');
+      }
+
+      if (schedule.doctorId !== doctorId) {
+        throw new BadRequestException(
+          'Schedule does not belong to this doctor',
+        );
+      }
+
+      if (schedule.isActive) {
+        return {
+          scheduleReactivated: false,
+          slotsReactivated: 0,
+          slotsGenerated: 0,
+          errors: ['Schedule is already active'],
+        };
+      }
+
+      // 2️⃣ Reactivate the schedule
+      await tx.schedule.update({
+        where: { id: scheduleId },
+        data: { isActive: true },
+      });
+
+      // 3️⃣ Reactivate existing future slots
+      const reactivateResult =
+        await this.slotsService.reactivateSlotsForSchedule(tx, scheduleId);
+
+      // 4️⃣ Generate new slots for the reactivated schedule
+      const scheduleData = await tx.schedule.findUnique({
+        where: { id: scheduleId },
+      });
+
+      const generateResult = await this.slotGenerator.generateSlotsForSchedule(
+        tx,
+        scheduleData,
+      );
+
+      return {
+        scheduleReactivated: true,
+        slotsReactivated: reactivateResult.slotsReactivated,
+        slotsGenerated: generateResult.slotsCreated,
+        errors: [...reactivateResult.errors, ...generateResult.errors],
+      };
+    });
+  }
+
+  /**
+   * Gets all schedules for a doctor (including inactive ones)
+   * This is useful for administrative purposes
+   */
+  async getAllDoctorSchedules(
+    doctorId: string,
+  ): Promise<ScheduleResponseDto[]> {
+    await this.validateDoctorExists(doctorId);
+
+    const schedules = await this.prisma.schedule.findMany({
+      where: { doctorId },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+      },
+      orderBy: [
+        { isActive: 'desc' },
+        { dayOfWeek: 'asc' },
+        { startTime: 'asc' },
+      ],
+    });
+
+    return this.mapSchedulesToResponse(schedules);
+  }
+
+  /**
+   * Gets only inactive schedules for a doctor
+   * This is useful for reactivation purposes
+   */
+  async getInactiveDoctorSchedules(
+    doctorId: string,
+  ): Promise<ScheduleResponseDto[]> {
+    await this.validateDoctorExists(doctorId);
+
+    const schedules = await this.prisma.schedule.findMany({
+      where: {
+        doctorId,
+        isActive: false,
+      },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    });
+
+    return this.mapSchedulesToResponse(schedules);
   }
 }

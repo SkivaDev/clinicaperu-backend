@@ -181,12 +181,13 @@ model Slot {
   endAt         DateTime
   status        SlotStatus @default(FREE)
   holdExpiresAt DateTime?
+  isActive      Boolean    @default(true)
   createdAt     DateTime   @default(now())
 
-  appointment Appointment?
+  appointment   Appointment?
 
   scheduleId    String
-  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule      Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@unique([scheduleId, startAt])
   @@index([status, startAt])

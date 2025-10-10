@@ -253,6 +253,7 @@ export class SlotGeneratorService {
         startAt: currentTime,
         endAt: slotEndTime,
         status: 'FREE' as const,
+        isActive: true,
       });
 
       currentTime = slotEndTime;
@@ -273,17 +274,20 @@ export class SlotGeneratorService {
 
   /**
    * Cleans up future free slots for inactive schedules
+   * Now uses soft deletion (isActive = false) instead of hard deletion
    */
   async cleanupFutureFreeSlotsForDoctor(
     tx: any,
     doctorId: string,
   ): Promise<number> {
-    const result = await tx.slot.deleteMany({
+    const result = await tx.slot.updateMany({
       where: {
         schedule: { doctorId },
         startAt: { gte: new Date() },
         status: 'FREE',
+        isActive: true,
       },
+      data: { isActive: false },
     });
 
     return result.count;
