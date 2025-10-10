@@ -17,10 +17,11 @@ export class UsersService {
   // }
 
   async create(dto: CreateUserDto) {
+    const { password, ...userData } = dto;
     return this.prisma.user.create({
       data: {
-        ...dto,
-        passwordHash: await this.hashingService.hash(dto.password),
+        ...userData,
+        passwordHash: await this.hashingService.hash(password),
       },
     });
   }
