@@ -1,15 +1,12 @@
 import {
   Controller,
   Get,
-  // Post,
+  Post,
   Body,
   Patch,
   Param,
-  // Delete,
   HttpStatus,
 } from '@nestjs/common';
-// import { CreateScheduleDto } from './dto/create-schedule.dto';
-// import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { ScheduleResponseDto } from './dto/schedule-response.dto';
 import { ResponseDto } from 'src/common/dto/response.dto';
 import { UpdateSchedulesDto } from './dto/update-schedule.dto';
@@ -44,6 +41,45 @@ export class SchedulesController {
       statusCode: HttpStatus.OK,
       message: 'Schedules updated successfully',
       data: updatedSchedules,
+    };
+  }
+
+  @Post('regenerate-slots')
+  async regenerateSlots(@Param('doctorId') doctorId: string): Promise<
+    ResponseDto<{
+      schedulesProcessed: number;
+      slotsGenerated: number;
+      errors: string[];
+    }>
+  > {
+    const result =
+      await this.schedulesService.regenerateSlotsForDoctor(doctorId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Slots regenerated successfully',
+      data: result,
+    };
+  }
+
+  @Get('statistics')
+  async getScheduleStatistics(@Param('doctorId') doctorId: string): Promise<
+    ResponseDto<{
+      totalSchedules: number;
+      activeSchedules: number;
+      inactiveSchedules: number;
+      totalSlots: number;
+      freeSlots: number;
+      bookedSlots: number;
+      heldSlots: number;
+      blockedSlots: number;
+    }>
+  > {
+    const statistics =
+      await this.schedulesService.getScheduleStatistics(doctorId);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Schedule statistics retrieved successfully',
+      data: statistics,
     };
   }
 }

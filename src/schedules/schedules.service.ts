@@ -9,10 +9,14 @@ import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { ScheduleResponseDto } from './dto/schedule-response.dto';
 import { PrismaService } from 'src/prisma.service';
 import { SlotResponseDto } from 'src/slots/dto/slot-response.dto';
+import { SlotGeneratorService } from 'src/slots/slot-generator.service';
 
 @Injectable()
 export class SchedulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly slotGenerator: SlotGeneratorService,
+  ) {}
 
   private readonly DAY_NAMES = [
     'Domingo',
@@ -39,10 +43,13 @@ export class SchedulesService {
 
     // 3. Transacción para actualizar todo
     return await this.prisma.$transaction(async (tx) => {
-      // Eliminar horarios y slots existentes
-      await this.deleteExistingSchedules(tx, doctorId);
+      // Marcar horarios existentes como inactivos (soft delete)
+      await this.deactivateExistingSchedules(tx, doctorId);
 
-      // Crear nuevos horarios
+      // Limpiar solo slots futuros libres de horarios desactivados
+      await this.slotGenerator.cleanupFutureFreeSlotsForDoctor(tx, doctorId);
+
+      // Crear nuevos horarios activos
       const newSchedules = await this.createNewSchedules(
         tx,
         doctorId,
@@ -50,10 +57,13 @@ export class SchedulesService {
       );
 
       // Generar slots para horarios activos
-      await this.generateSlotsForActiveSchedules(tx, newSchedules);
+      await this.slotGenerator.generateSlotsForActiveSchedules(
+        tx,
+        newSchedules,
+      );
 
-      // Retornar horarios actualizados
-      return this.getSchedulesWithSlots(tx, doctorId);
+      // Retornar horarios actualizados (solo activos)
+      return this.getActiveSchedulesWithSlots(tx, doctorId);
     });
   }
 
@@ -109,17 +119,14 @@ export class SchedulesService {
     return s1.startTime < s2.endTime && s2.startTime < s1.endTime;
   }
 
-  private async deleteExistingSchedules(
+  private async deactivateExistingSchedules(
     tx: any,
     doctorId: string,
   ): Promise<void> {
-    // Eliminar en el orden correcto para evitar violaciones de FK
-    await tx.slot.deleteMany({
-      where: { schedule: { doctorId } },
-    });
-
-    await tx.schedule.deleteMany({
+    // Marcar horarios existentes como inactivos (soft delete)
+    await tx.schedule.updateMany({
       where: { doctorId },
+      data: { isActive: false },
     });
   }
 
@@ -138,92 +145,29 @@ export class SchedulesService {
       isActive: schedule.isActive !== false,
       doctorId,
     }));
-    // Inserta los registros
+
+    // Insertar los nuevos horarios
     await tx.schedule.createMany({ data: scheduleData });
-    // 👇 Devuelve los registros recién creados (para usarlos en generateSlots)
+
+    // Retornar solo los horarios activos recién creados
     return tx.schedule.findMany({
-      where: { doctorId },
+      where: {
+        doctorId,
+        isActive: true,
+      },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     });
   }
 
-  private async generateSlotsForActiveSchedules(
-    tx: any,
-    schedules: any[],
-  ): Promise<void> {
-    const activeSchedules = schedules.filter((s) => s.isActive);
-
-    // Procesar en paralelo si hay muchos horarios
-    const slotPromises = activeSchedules.map((schedule) =>
-      this.generateSlotsForSchedule(tx, schedule),
-    );
-
-    await Promise.all(slotPromises);
-  }
-
-  private async generateSlotsForSchedule(
-    tx: any,
-    schedule: any,
-  ): Promise<void> {
-    const slots = this.calculateSlots(schedule);
-
-    if (slots.length > 0) {
-      await tx.slot.createMany({
-        data: slots,
-      });
-    }
-  }
-
-  private calculateSlots(schedule: any): any[] {
-    const slots: any[] = [];
-    const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
-    const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
-
-    let currentHour = startHour;
-    let currentMinute = startMinute;
-
-    while (
-      currentHour < endHour ||
-      (currentHour === endHour && currentMinute < endMinute)
-    ) {
-      const startAt = new Date();
-      startAt.setHours(currentHour, currentMinute, 0, 0);
-
-      const endAt = new Date(startAt);
-      endAt.setMinutes(endAt.getMinutes() + schedule.slotMinutes);
-
-      // Verificar que no exceda el horario de fin
-      if (
-        endAt.getHours() > endHour ||
-        (endAt.getHours() === endHour && endAt.getMinutes() > endMinute)
-      ) {
-        break;
-      }
-
-      slots.push({
-        scheduleId: schedule.id,
-        startAt: startAt,
-        endAt: endAt,
-        status: 'FREE' as const,
-      });
-
-      // Avanzar al siguiente slot
-      currentMinute += schedule.slotMinutes;
-      if (currentMinute >= 60) {
-        currentHour += Math.floor(currentMinute / 60);
-        currentMinute = currentMinute % 60;
-      }
-    }
-
-    return slots;
-  }
-
-  private async getSchedulesWithSlots(
+  private async getActiveSchedulesWithSlots(
     tx: any,
     doctorId: string,
   ): Promise<ScheduleResponseDto[]> {
     const schedules = await tx.schedule.findMany({
-      where: { doctorId },
+      where: {
+        doctorId,
+        isActive: true, // Solo horarios activos
+      },
       include: {
         slots: {
           orderBy: { startAt: 'asc' },
@@ -254,12 +198,15 @@ export class SchedulesService {
     }));
   }
 
-  // Método auxiliar para obtener horarios (sin transacción)
+  // Método auxiliar para obtener horarios activos (sin transacción)
   async getDoctorSchedules(doctorId: string): Promise<ScheduleResponseDto[]> {
     await this.validateDoctorExists(doctorId);
 
     const schedules = await this.prisma.schedule.findMany({
-      where: { doctorId },
+      where: {
+        doctorId,
+        isActive: true, // Solo horarios activos
+      },
       include: {
         slots: {
           orderBy: { startAt: 'asc' },
@@ -292,5 +239,111 @@ export class SchedulesService {
         createdAt: slot.createdAt,
       })),
     }));
+  }
+
+  /**
+   * Regenerates slots for all active schedules of a doctor
+   * Useful for cron jobs or manual slot regeneration
+   */
+  async regenerateSlotsForDoctor(doctorId: string): Promise<{
+    schedulesProcessed: number;
+    slotsGenerated: number;
+    errors: string[];
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Get all active schedules for the doctor
+      const activeSchedules = await tx.schedule.findMany({
+        where: {
+          doctorId,
+          isActive: true,
+        },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      });
+
+      if (activeSchedules.length === 0) {
+        return {
+          schedulesProcessed: 0,
+          slotsGenerated: 0,
+          errors: ['No active schedules found for doctor'],
+        };
+      }
+
+      // Clean up future free slots first
+      await this.slotGenerator.cleanupFutureFreeSlotsForDoctor(tx, doctorId);
+
+      // Generate new slots for all active schedules
+      const results = await this.slotGenerator.generateSlotsForActiveSchedules(
+        tx,
+        activeSchedules,
+      );
+
+      const totalSlotsGenerated = results.reduce(
+        (sum, result) => sum + result.slotsCreated,
+        0,
+      );
+      const allErrors = results.flatMap((result) => result.errors);
+
+      return {
+        schedulesProcessed: activeSchedules.length,
+        slotsGenerated: totalSlotsGenerated,
+        errors: allErrors,
+      };
+    });
+  }
+
+  /**
+   * Gets schedule statistics for a doctor
+   */
+  async getScheduleStatistics(doctorId: string): Promise<{
+    totalSchedules: number;
+    activeSchedules: number;
+    inactiveSchedules: number;
+    totalSlots: number;
+    freeSlots: number;
+    bookedSlots: number;
+    heldSlots: number;
+    blockedSlots: number;
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    const [scheduleStats, slotStats] = await Promise.all([
+      this.prisma.schedule.groupBy({
+        by: ['isActive'],
+        where: { doctorId },
+        _count: { _all: true },
+      }),
+      this.prisma.slot.groupBy({
+        by: ['status'],
+        where: { schedule: { doctorId } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const activeSchedules =
+      scheduleStats.find((s) => s.isActive)?._count._all || 0;
+    const inactiveSchedules =
+      scheduleStats.find((s) => !s.isActive)?._count._all || 0;
+
+    const freeSlots =
+      slotStats.find((s) => s.status === 'FREE')?._count._all || 0;
+    const bookedSlots =
+      slotStats.find((s) => s.status === 'BOOKED')?._count._all || 0;
+    const heldSlots =
+      slotStats.find((s) => s.status === 'HELD')?._count._all || 0;
+    const blockedSlots =
+      slotStats.find((s) => s.status === 'BLOCKED')?._count._all || 0;
+
+    return {
+      totalSchedules: activeSchedules + inactiveSchedules,
+      activeSchedules,
+      inactiveSchedules,
+      totalSlots: freeSlots + bookedSlots + heldSlots + blockedSlots,
+      freeSlots,
+      bookedSlots,
+      heldSlots,
+      blockedSlots,
+    };
   }
 }
