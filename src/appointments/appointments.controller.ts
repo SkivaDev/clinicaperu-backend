@@ -9,6 +9,17 @@ import {
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiUnauthorizedResponse,
+  ApiOkResponse,
+  ApiForbiddenResponse,
+} from '@nestjs/swagger';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CalendarQueryDto } from './dto/calendar-query.dto';
@@ -21,6 +32,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role, AppointmentStatus } from '@prisma/client';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
 
+@ApiTags('Gestión de Citas')
+@ApiBearerAuth('bearerAuth')
+@ApiCookieAuth('cookieAuth')
+@ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
+@ApiForbiddenResponse({ description: 'Acceso denegado - Se requiere autenticación' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('appointments')
 export class AppointmentsController {
@@ -56,6 +72,23 @@ export class AppointmentsController {
   //   }
   @Get(':id')
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
+  @ApiOperation({ 
+    summary: 'Obtener cita por ID',
+    description: 'Obtiene los detalles de una cita específica por su ID'
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único de la cita',
+    example: 'uuid-here'
+  })
+  @ApiOkResponse({
+    description: 'Cita obtenida exitosamente',
+    type: ResponseDto<AppointmentResponseDto>
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cita no encontrada'
+  })
   async getAppointmentById(
     @Param('id') id: string,
   ): Promise<ResponseDto<AppointmentResponseDto>> {
@@ -70,6 +103,14 @@ export class AppointmentsController {
 
   @Get()
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
+  @ApiOperation({ 
+    summary: 'Listar todas las citas',
+    description: 'Obtiene la lista completa de citas del sistema'
+  })
+  @ApiOkResponse({
+    description: 'Lista de citas obtenida exitosamente',
+    type: ResponseDto<AppointmentResponseDto[]>
+  })
   async getAllAppointments(): Promise<ResponseDto<AppointmentResponseDto[]>> {
     const appointments = await this.appointmentsService.getAllAppointments();
 
