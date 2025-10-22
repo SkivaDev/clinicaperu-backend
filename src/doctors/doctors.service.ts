@@ -10,6 +10,10 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { PrismaService } from 'src/prisma.service';
 import { HashingService } from 'src/common/hashing/hashing.service';
 import { UpdateUserDto } from 'src/users/dto/update-user.dto';
+import {
+  PublicDoctorListDto,
+  PublicDoctorDetailDto,
+} from './dto/public-doctor.dto';
 
 @Injectable()
 export class DoctorsService {
@@ -194,5 +198,160 @@ export class DoctorsService {
       where: { specialtyId },
       include: { user: true, clinic: true },
     });
+  }
+
+  // Métodos públicos para el controlador público
+  async findPublicDoctors(params: {
+    search?: string;
+    specialtyId?: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    data: PublicDoctorListDto[];
+    meta: { total: number; page: number; limit: number; totalPages: number };
+  }> {
+    const { search, specialtyId, page, limit } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      user: {
+        isActive: true,
+      },
+    };
+
+    if (search) {
+      where.OR = [
+        {
+          user: {
+            firstName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          user: {
+            lastName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+      ];
+    }
+
+    if (specialtyId) {
+      where.specialtyId = specialtyId;
+    }
+
+    const [doctors, total] = await Promise.all([
+      this.prisma.doctor.findMany({
+        where,
+        include: {
+          user: true,
+          specialty: true,
+          clinic: true,
+          appointments: {
+            select: {
+              id: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: {
+          user: {
+            firstName: 'asc',
+          },
+        },
+      }),
+      this.prisma.doctor.count({ where }),
+    ]);
+
+    const data: PublicDoctorListDto[] = doctors.map((doctor) => ({
+      id: doctor.id,
+      name: doctor.user.firstName,
+      lastName: doctor.user.lastName,
+      cmp: doctor.cmp,
+      specialty: {
+        id: doctor.specialty.id,
+        name: doctor.specialty.name,
+      },
+      clinic: {
+        id: doctor.clinic.id,
+        name: doctor.clinic.name,
+      },
+      rating: doctor.rating > 0 ? doctor.rating : undefined,
+      totalAppointments: doctor.appointments.length,
+    }));
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findPublicDoctorById(
+    id: string,
+  ): Promise<PublicDoctorDetailDto | null> {
+    const doctor = await this.prisma.doctor.findUnique({
+      where: {
+        id,
+        user: {
+          isActive: true,
+        },
+      },
+      include: {
+        user: true,
+        specialty: true,
+        clinic: true,
+        schedules: {
+          where: {
+            isActive: true,
+          },
+        },
+        appointments: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!doctor) {
+      return null;
+    }
+
+    const rating = doctor.rating > 0 ? doctor.rating : undefined;
+
+    return {
+      id: doctor.id,
+      name: doctor.user.firstName,
+      lastName: doctor.user.lastName,
+      email: doctor.user.email,
+      phone: doctor.user.phone || undefined,
+      cmp: doctor.cmp,
+      image: doctor.user.profileImage || undefined,
+      specialty: {
+        id: doctor.specialty.id,
+        name: doctor.specialty.name,
+      },
+      clinic: {
+        id: doctor.clinic.id,
+        name: doctor.clinic.name,
+      },
+      rating,
+      totalAppointments: doctor.appointments.length,
+      schedules: doctor.schedules.map((schedule) => ({
+        dayOfWeek: schedule.dayOfWeek,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+      })),
+    };
   }
 }

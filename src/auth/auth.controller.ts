@@ -39,9 +39,9 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Registrar nuevo usuario',
-    description: 'Crea una nueva cuenta de usuario en el sistema'
+    description: 'Crea una nueva cuenta de usuario en el sistema',
   })
   @ApiBody({ type: RegisterDto })
   @ApiCreatedResponse({
@@ -49,17 +49,17 @@ export class AuthController {
     schema: {
       example: {
         statusCode: 201,
-        message: 'User registered successfully'
-      }
-    }
+        message: 'User registered successfully',
+      },
+    },
   })
   @ApiResponse({
     status: 400,
-    description: 'Datos de entrada inválidos'
+    description: 'Datos de entrada inválidos',
   })
   @ApiResponse({
     status: 409,
-    description: 'El usuario ya existe'
+    description: 'El usuario ya existe',
   })
   async register(@Body() registerDto: RegisterDto) {
     await this.authService.register(registerDto);
@@ -72,9 +72,9 @@ export class AuthController {
   @Post('login')
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Iniciar sesión',
-    description: 'Autentica al usuario y retorna un token JWT'
+    description: 'Autentica al usuario y retorna un token JWT',
   })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({
@@ -89,18 +89,18 @@ export class AuthController {
             id: 'uuid-here',
             email: 'usuario@example.com',
             firstName: 'Juan',
-            lastName: 'Pérez'
-          }
-        }
-      }
-    }
+            lastName: 'Pérez',
+          },
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({
-    description: 'Credenciales inválidas'
+    description: 'Credenciales inválidas',
   })
   @ApiResponse({
     status: 400,
-    description: 'Datos de entrada inválidos'
+    description: 'Datos de entrada inválidos',
   })
   async login(
     @Request() req: { user: AuthenticatedUser },
@@ -127,9 +127,9 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtener perfil del usuario',
-    description: 'Retorna la información del perfil del usuario autenticado'
+    description: 'Retorna la información del perfil del usuario autenticado',
   })
   @ApiBearerAuth('bearerAuth')
   @ApiCookieAuth('cookieAuth')
@@ -145,13 +145,13 @@ export class AuthController {
           email: 'usuario@example.com',
           firstName: 'Juan',
           lastName: 'Pérez',
-          role: 'PATIENT'
-        }
-      }
-    }
+          role: 'PATIENT',
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado'
+    description: 'Token JWT inválido o expirado',
   })
   async getProfile(@Request() req) {
     return {
@@ -164,9 +164,10 @@ export class AuthController {
   @Get('admin/dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Dashboard de administrador',
-    description: 'Obtiene el dashboard con funcionalidades específicas para administradores'
+    description:
+      'Obtiene el dashboard con funcionalidades específicas para administradores',
   })
   @ApiBearerAuth('bearerAuth')
   @ApiCookieAuth('cookieAuth')
@@ -180,24 +181,24 @@ export class AuthController {
           user: {
             id: 'uuid-here',
             dni: '12345678',
-            role: 'ADMIN'
+            role: 'ADMIN',
           },
           adminFeatures: [
             'Gestión de usuarios',
             'Gestión de citas',
             'Gestión de doctores',
-            'Reportes y estadísticas'
-          ]
-        }
-      }
-    }
+            'Reportes y estadísticas',
+          ],
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado'
+    description: 'Token JWT inválido o expirado',
   })
   @ApiResponse({
     status: 403,
-    description: 'Acceso denegado - Se requiere rol de ADMIN'
+    description: 'Acceso denegado - Se requiere rol de ADMIN',
   })
   async getAdminDashboard(@CurrentUser() user: CurrentUserPayload) {
     return {
@@ -226,9 +227,10 @@ export class AuthController {
   @Get('patient/dashboard')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.PATIENT)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Dashboard de paciente',
-    description: 'Obtiene el dashboard con funcionalidades específicas para pacientes'
+    description:
+      'Obtiene el dashboard con funcionalidades específicas para pacientes',
   })
   @ApiBearerAuth('bearerAuth')
   @ApiCookieAuth('cookieAuth')
@@ -242,24 +244,24 @@ export class AuthController {
           user: {
             id: 'uuid-here',
             dni: '12345678',
-            role: 'PATIENT'
+            role: 'PATIENT',
           },
           patientFeatures: [
             'Mis citas',
             'Reservar cita',
             'Historial médico',
-            'Perfil personal'
-          ]
-        }
-      }
-    }
+            'Perfil personal',
+          ],
+        },
+      },
+    },
   })
   @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado'
+    description: 'Token JWT inválido o expirado',
   })
   @ApiResponse({
     status: 403,
-    description: 'Acceso denegado - Se requiere rol de PATIENT'
+    description: 'Acceso denegado - Se requiere rol de PATIENT',
   })
   async getPatientDashboard(@CurrentUser() user: CurrentUserPayload) {
     return {
