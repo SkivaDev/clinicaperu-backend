@@ -1,229 +1,229 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// // This is your Prisma schema file,
+// // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
-generator client {
-  provider = "prisma-client-js"
-}
+// generator client {
+//   provider = "prisma-client-js"
+// }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+// datasource db {
+//   provider = "postgresql"
+//   url      = env("DATABASE_URL")
+// }
 
-enum Role {
-  ADMIN
-  PATIENT
-  DOCTOR
-}
+// enum Role {
+//   ADMIN
+//   PATIENT
+//   DOCTOR
+// }
 
-enum Gender {
-  MALE
-  FEMALE
-}
+// enum Gender {
+//   MALE
+//   FEMALE
+// }
 
-enum SlotStatus {
-  FREE
-  HELD
-  BOOKED
-  BLOCKED
-}
+// enum SlotStatus {
+//   FREE
+//   HELD
+//   BOOKED
+//   BLOCKED
+// }
 
-enum AppointmentStatus {
-  PENDING
-  CONFIRMED
-  ATTENDED
-  CANCELLED
-  NO_SHOW
-}
+// enum AppointmentStatus {
+//   PENDING
+//   CONFIRMED
+//   ATTENDED
+//   CANCELLED
+//   NO_SHOW
+// }
 
-enum RoomType {
-  CONSULTATION
-  SURGERY
-  EMERGENCY
-  ICU
-  LABORATORY
-  RADIOLOGY
-}
+// enum RoomType {
+//   CONSULTATION
+//   SURGERY
+//   EMERGENCY
+//   ICU
+//   LABORATORY
+//   RADIOLOGY
+// }
 
-model User {
-  id           String   @id @default(uuid())
-  dni          String   @unique
-  email        String   @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  dayOfBirth   DateTime
-  phone        String?
-  gender       Gender
-  profileImage String?
+// model User {
+//   id           String   @id @default(uuid())
+//   dni          String   @unique
+//   email        String   @unique
+//   passwordHash String
+//   firstName    String
+//   lastName     String
+//   dayOfBirth   DateTime
+//   phone        String?
+//   gender       Gender
+//   profileImage String?
   
-  role         Role     @default(PATIENT)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+//   role         Role     @default(PATIENT)
+//   isActive     Boolean  @default(true)
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
 
-  // Relación uno a uno si el user es un doctor
-  doctor Doctor?
+//   // Relación uno a uno si el user es un doctor
+//   doctor Doctor?
 
-  // Relación con citas y correos
-  appointments Appointment[]
+//   // Relación con citas y correos
+//   appointments Appointment[]
 
-  @@index([lastName])
-  @@index([firstName, lastName])
-}
+//   @@index([lastName])
+//   @@index([firstName, lastName])
+// }
 
 
-model Clinic {
-  id           String  @id @default(uuid())
-  name         String  @unique
-  address      String
-  ubigeoDept   String
-  ubigeoProv   String
-  ubigeoDist   String
-  phone        String?
-  email        String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// model Clinic {
+//   id           String  @id @default(uuid())
+//   name         String  @unique
+//   address      String
+//   ubigeoDept   String
+//   ubigeoProv   String
+//   ubigeoDist   String
+//   phone        String?
+//   email        String?
+//   isActive     Boolean  @default(true)
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
 
-  rooms        Room[]
-  doctors      Doctor[]
-  @@index([name])
-}
+//   rooms        Room[]
+//   doctors      Doctor[]
+//   @@index([name])
+// }
 
-model Room {
-  id               String  @id @default(uuid())
-  name             String
-  roomNumber       String
-  roomType         RoomType
-  floor            Int
-  capacity         Int
-  isActive         Boolean   @default(true)
-  equipment        String[]  // text[] en Postgres
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+// model Room {
+//   id               String  @id @default(uuid())
+//   name             String
+//   roomNumber       String
+//   roomType         RoomType
+//   floor            Int
+//   capacity         Int
+//   isActive         Boolean   @default(true)
+//   equipment        String[]  // text[] en Postgres
+//   createdAt        DateTime  @default(now())
+//   updatedAt        DateTime  @updatedAt
 
-  clinicId         String
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+//   clinicId         String
+//   clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
 
-  @@unique([clinicId, name])
-  @@index([roomType])
-}
+//   @@unique([clinicId, name])
+//   @@index([roomType])
+// }
 
-model Specialty {
-  id               String @id @default(uuid())
-  name             String @unique
-  description      String?
-  isActive         Boolean @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  doctors          Doctor[]
-}
+// model Specialty {
+//   id               String @id @default(uuid())
+//   name             String @unique
+//   description      String?
+//   isActive         Boolean @default(true)
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
+//   doctors          Doctor[]
+// }
 
-model Doctor {
-  id            String    @id @default(uuid())
-  cmp           Int    @unique // Código de colegiatura
+// model Doctor {
+//   id            String    @id @default(uuid())
+//   cmp           Int    @unique // Código de colegiatura
 
-  // Datos profesionales
-  isActive          Boolean  @default(true)
-  yearsOfExperience Int?
-  consultationPrice Float?
-  attendedAppointments Int @default(0)
-  attendedPatients Int @default(0)
-  rating            Float @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+//   // Datos profesionales
+//   isActive          Boolean  @default(true)
+//   yearsOfExperience Int?
+//   consultationPrice Float?
+//   attendedAppointments Int @default(0)
+//   attendedPatients Int @default(0)
+//   rating            Float @default(0)
+//   createdAt         DateTime @default(now())
+//   updatedAt         DateTime @updatedAt
 
-  // Agenda
-  schedules          Schedule[]
-  unavail            DoctorUnavailability[]
-  appointments       Appointment[]
+//   // Agenda
+//   schedules          Schedule[]
+//   unavail            DoctorUnavailability[]
+//   appointments       Appointment[]
 
-  // Datos laborales del doctor
-  specialtyId        String
-  specialty          Specialty @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
-  clinicId           String
-  clinic             Clinic    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+//   // Datos laborales del doctor
+//   specialtyId        String
+//   specialty          Specialty @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+//   clinicId           String
+//   clinic             Clinic    @relation(fields: [clinicId], references: [id], onDelete: Restrict)
 
-  // Relación con User
-  userId             String    @unique   // vínculo con tabla User
-  user               User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@index([cmp])
-  @@index([specialtyId, clinicId])
-}
+//   // Relación con User
+//   userId             String    @unique   // vínculo con tabla User
+//   user               User @relation(fields: [userId], references: [id], onDelete: Cascade)
+//   @@index([cmp])
+//   @@index([specialtyId, clinicId])
+// }
 
-model Schedule {
-  id               String   @id @default(uuid())
-  dayOfWeek        Int      // 0=Dom, 6=Sáb
-  startTime        String   // "08:00"
-  endTime          String   // "14:00"
-  slotMinutes      Int
-  isActive         Boolean  @default(true)
-  effectiveFrom    DateTime?
-  effectiveTo      DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+// model Schedule {
+//   id               String   @id @default(uuid())
+//   dayOfWeek        Int      // 0=Dom, 6=Sáb
+//   startTime        String   // "08:00"
+//   endTime          String   // "14:00"
+//   slotMinutes      Int
+//   isActive         Boolean  @default(true)
+//   effectiveFrom    DateTime?
+//   effectiveTo      DateTime?
+//   createdAt        DateTime @default(now())
+//   updatedAt        DateTime @updatedAt
 
-  slots            Slot[]
+//   slots            Slot[]
 
-  doctorId         String
-  doctor           Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+//   doctorId         String
+//   doctor           Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
-  @@index([doctorId, dayOfWeek])
-}
+//   @@index([doctorId, dayOfWeek])
+// }
 
-model Slot {
-  id            String     @id @default(uuid())
-  startAt       DateTime
-  endAt         DateTime
-  status        SlotStatus @default(FREE)
-  holdExpiresAt DateTime?
-  createdAt     DateTime   @default(now())
+// model Slot {
+//   id            String     @id @default(uuid())
+//   startAt       DateTime
+//   endAt         DateTime
+//   status        SlotStatus @default(FREE)
+//   holdExpiresAt DateTime?
+//   createdAt     DateTime   @default(now())
 
-  appointment Appointment?
+//   appointment Appointment?
 
-  scheduleId    String
-  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+//   scheduleId    String
+//   schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
-  @@unique([scheduleId, startAt])
-  @@index([status, startAt])
-  @@index([startAt])
-}
+//   @@unique([scheduleId, startAt])
+//   @@index([status, startAt])
+//   @@index([startAt])
+// }
 
-model Appointment {
-  id          String            @id @default(uuid())
-  status      AppointmentStatus @default(PENDING)
-  reason      String?
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  confirmedAt DateTime?
-  cancelledAt DateTime?
-  attendedAt  DateTime?
+// model Appointment {
+//   id          String            @id @default(uuid())
+//   status      AppointmentStatus @default(PENDING)
+//   reason      String?
+//   notes       String?
+//   createdAt   DateTime          @default(now())
+//   updatedAt   DateTime          @updatedAt
+//   confirmedAt DateTime?
+//   cancelledAt DateTime?
+//   attendedAt  DateTime?
 
-  userId      String            // paciente
-  user    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
-  doctorId    String
-  doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
-  slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
-  slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
+//   userId      String            // paciente
+//   user    User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+//   doctorId    String
+//   doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+//   slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
+//   slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
 
-  @@index([doctorId, createdAt])
-  @@index([userId, createdAt])
-  // Extra: índice parcial raw SQL para asegurar única cita por slot activo
-}
+//   @@index([doctorId, createdAt])
+//   @@index([userId, createdAt])
+//   // Extra: índice parcial raw SQL para asegurar única cita por slot activo
+// }
 
-model DoctorUnavailability {
-  id        String   @id @default(uuid())
-  startAt   DateTime
-  endAt     DateTime
-  reason    String?
+// model DoctorUnavailability {
+//   id        String   @id @default(uuid())
+//   startAt   DateTime
+//   endAt     DateTime
+//   reason    String?
 
-  doctorId  String
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+//   doctorId  String
+//   doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
-  @@index([doctorId, startAt, endAt])
-}
+//   @@index([doctorId, startAt, endAt])
+// }

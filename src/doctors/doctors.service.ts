@@ -7,7 +7,7 @@ import {
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { HashingService } from 'src/common/hashing/hashing.service';
 import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 import {

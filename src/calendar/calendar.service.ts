@@ -7,7 +7,7 @@ import {
   CalendarScope,
   GetCalendarQueryDto,
 } from './dto/get-calendar-query.dto';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma, SlotStatus } from '@prisma/client';
 
 @Injectable()

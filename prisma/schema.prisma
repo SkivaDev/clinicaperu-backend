@@ -48,6 +48,21 @@ enum RoomType {
   RADIOLOGY
 }
 
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+  RETRYING
+}
+
+enum EmailTemplate {
+  BOOKING_CONFIRMATION
+  BOOKING_CANCELLATION
+  BOOKING_REMINDER
+  PASSWORD_RESET
+  WELCOME
+}
+
 model User {
   id           String   @id @default(uuid())
   dni          String   @unique
@@ -227,4 +242,21 @@ model DoctorUnavailability {
   doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   @@index([doctorId, startAt, endAt])
+}
+
+model EmailMessage {
+  id          String       @id @default(uuid())
+  to          String
+  subject     String
+  template    EmailTemplate
+  variables   Json         // { patientName: "John", doctorName: "Dr. Smith", date: "..." }
+  status      EmailStatus  @default(PENDING)
+  attempts    Int          @default(0)
+  lastError   String?
+  sentAt      DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([to])
 }

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SchedulesService } from './schedules.service';
 import { SlotGeneratorService } from 'src/slots/slot-generator.service';
 import { SlotsService } from 'src/slots/slots.service';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('SchedulesService - Soft Deletion', () => {

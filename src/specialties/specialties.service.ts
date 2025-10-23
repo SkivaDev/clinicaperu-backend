@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 
 @Injectable()

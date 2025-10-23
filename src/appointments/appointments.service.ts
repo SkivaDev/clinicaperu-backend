@@ -3,7 +3,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
 // import { CreateAppointmentDto } from './dto/create-appointment.dto';
 // import { CalendarQueryDto } from './dto/calendar-query.dto';

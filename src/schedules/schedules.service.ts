@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { ScheduleResponseDto } from './dto/schedule-response.dto';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotGeneratorService } from 'src/slots/slot-generator.service';
 import { SlotsService } from 'src/slots/slots.service';
 
