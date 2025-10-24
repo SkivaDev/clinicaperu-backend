@@ -3,9 +3,11 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { ScheduleResponseDto } from './dto/schedule-response.dto';
+import { QueryScheduleDto } from './dto/query-schedule.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotGeneratorService } from 'src/slots/slot-generator.service';
 import { SlotsService } from 'src/slots/slots.service';
@@ -525,5 +527,388 @@ export class SchedulesService {
     });
 
     return this.mapSchedulesToResponse(schedules);
+  }
+
+  /**
+   * Creates a single schedule (HU-020 requirement)
+   */
+  async create(dto: CreateScheduleDto): Promise<ScheduleResponseDto> {
+    // Validate doctor exists
+    await this.validateDoctorExists(dto.doctorId);
+
+    // Validate time logic
+    this.validateTimeRange(dto.startTime, dto.endTime);
+    this.validateSlotDuration(dto.startTime, dto.endTime, dto.slotMinutes);
+    this.validateEffectiveDates(dto.effectiveFrom, dto.effectiveTo);
+
+    // Check for overlaps with existing schedules
+    await this.validateNoOverlapWithExisting(dto);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Create the schedule
+      const schedule = await tx.schedule.create({
+        data: {
+          doctorId: dto.doctorId,
+          dayOfWeek: dto.dayOfWeek,
+          startTime: dto.startTime,
+          endTime: dto.endTime,
+          slotMinutes: dto.slotMinutes,
+          effectiveFrom: dto.effectiveFrom || null,
+          effectiveTo: dto.effectiveTo || null,
+          isActive: dto.isActive !== false,
+        },
+        include: {
+          slots: {
+            orderBy: { startAt: 'asc' },
+          },
+        },
+      });
+
+      // Generate slots if schedule is active
+      if (schedule.isActive) {
+        await this.slotGenerator.generateSlotsForSchedule(tx, schedule);
+      }
+
+      // Return the created schedule with slots
+      const scheduleWithSlots = await tx.schedule.findUnique({
+        where: { id: schedule.id },
+        include: {
+          slots: {
+            orderBy: { startAt: 'asc' },
+          },
+        },
+      });
+
+      return this.mapSchedulesToResponse([scheduleWithSlots])[0];
+    });
+  }
+
+  /**
+   * Finds all schedules with optional filters (HU-020 requirement)
+   */
+  async findAll(query: QueryScheduleDto): Promise<ScheduleResponseDto[]> {
+    const where: any = {};
+
+    if (query.doctorId) {
+      where.doctorId = query.doctorId;
+    }
+
+    if (query.dayOfWeek !== undefined) {
+      where.dayOfWeek = query.dayOfWeek;
+    }
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    const schedules = await this.prisma.schedule.findMany({
+      where,
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            specialty: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { doctorId: 'asc' },
+        { dayOfWeek: 'asc' },
+        { startTime: 'asc' },
+      ],
+    });
+
+    return this.mapSchedulesToResponse(schedules);
+  }
+
+  /**
+   * Finds a single schedule by ID (HU-020 requirement)
+   */
+  async findOne(id: string): Promise<ScheduleResponseDto> {
+    const schedule = await this.prisma.schedule.findUnique({
+      where: { id },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            specialty: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException(`Schedule with ID ${id} not found`);
+    }
+
+    return this.mapSchedulesToResponse([schedule])[0];
+  }
+
+  /**
+   * Updates a single schedule (HU-020 requirement)
+   * Cannot update if slots have been generated
+   */
+  async update(
+    id: string,
+    dto: Partial<CreateScheduleDto>,
+  ): Promise<ScheduleResponseDto> {
+    // Verify schedule exists
+    const existingSchedule = await this.prisma.schedule.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { slots: true },
+        },
+      },
+    });
+
+    if (!existingSchedule) {
+      throw new NotFoundException(`Schedule with ID ${id} not found`);
+    }
+
+    // Check if schedule has generated slots
+    if (existingSchedule._count.slots > 0) {
+      throw new ConflictException(
+        'No se puede actualizar un horario que ya tiene slots generados. Desactívelo y cree uno nuevo.',
+      );
+    }
+
+    // Validate new data if provided
+    if (dto.startTime && dto.endTime) {
+      this.validateTimeRange(dto.startTime, dto.endTime);
+    }
+
+    if (dto.startTime || dto.endTime || dto.slotMinutes) {
+      const startTime = dto.startTime || existingSchedule.startTime;
+      const endTime = dto.endTime || existingSchedule.endTime;
+      const slotMinutes = dto.slotMinutes || existingSchedule.slotMinutes;
+      this.validateSlotDuration(startTime, endTime, slotMinutes);
+    }
+
+    if (dto.effectiveFrom || dto.effectiveTo) {
+      this.validateEffectiveDates(
+        dto.effectiveFrom || existingSchedule.effectiveFrom,
+        dto.effectiveTo || existingSchedule.effectiveTo,
+      );
+    }
+
+    // Update the schedule
+    const updatedSchedule = await this.prisma.schedule.update({
+      where: { id },
+      data: {
+        ...(dto.dayOfWeek !== undefined && { dayOfWeek: dto.dayOfWeek }),
+        ...(dto.startTime && { startTime: dto.startTime }),
+        ...(dto.endTime && { endTime: dto.endTime }),
+        ...(dto.slotMinutes && { slotMinutes: dto.slotMinutes }),
+        ...(dto.effectiveFrom !== undefined && {
+          effectiveFrom: dto.effectiveFrom,
+        }),
+        ...(dto.effectiveTo !== undefined && { effectiveTo: dto.effectiveTo }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            specialty: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.mapSchedulesToResponse([updatedSchedule])[0];
+  }
+
+  /**
+   * Soft deletes a schedule (HU-020 requirement)
+   */
+  async remove(id: string): Promise<ScheduleResponseDto> {
+    const schedule = await this.prisma.schedule.findUnique({
+      where: { id },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException(`Schedule with ID ${id} not found`);
+    }
+
+    // Soft delete: mark as inactive
+    const deactivatedSchedule = await this.prisma.schedule.update({
+      where: { id },
+      data: { isActive: false },
+      include: {
+        slots: {
+          orderBy: { startAt: 'asc' },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+            specialty: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Deactivate future free slots
+    await this.slotsService.deactivateFutureFreeSlotsForSchedule(
+      this.prisma,
+      id,
+    );
+
+    return this.mapSchedulesToResponse([deactivatedSchedule])[0];
+  }
+
+  /**
+   * Helper: Validates time range
+   */
+  private validateTimeRange(startTime: string, endTime: string): void {
+    const startMinutes = this.timeToMinutes(startTime);
+    const endMinutes = this.timeToMinutes(endTime);
+
+    if (startMinutes >= endMinutes) {
+      throw new BadRequestException(
+        'La hora de inicio debe ser menor que la hora de fin',
+      );
+    }
+  }
+
+  /**
+   * Helper: Validates slot duration fits in time range
+   */
+  private validateSlotDuration(
+    startTime: string,
+    endTime: string,
+    slotMinutes: number,
+  ): void {
+    const startMinutes = this.timeToMinutes(startTime);
+    const endMinutes = this.timeToMinutes(endTime);
+    const totalMinutes = endMinutes - startMinutes;
+
+    if (totalMinutes < slotMinutes) {
+      throw new BadRequestException(
+        'La duración del slot es mayor que el rango de tiempo disponible',
+      );
+    }
+
+    // Optional: Check if slot duration divides evenly
+    if (totalMinutes % slotMinutes !== 0) {
+      console.warn(
+        `Slot duration ${slotMinutes} does not divide evenly into ${totalMinutes} minutes`,
+      );
+    }
+  }
+
+  /**
+   * Helper: Validates effective dates
+   */
+  private validateEffectiveDates(
+    effectiveFrom?: Date | null,
+    effectiveTo?: Date | null,
+  ): void {
+    if (effectiveFrom && effectiveTo) {
+      if (effectiveFrom >= effectiveTo) {
+        throw new BadRequestException(
+          'effectiveFrom debe ser menor que effectiveTo',
+        );
+      }
+    }
+  }
+
+  /**
+   * Helper: Validates no overlap with existing schedules
+   */
+  private async validateNoOverlapWithExisting(
+    dto: CreateScheduleDto,
+  ): Promise<void> {
+    const existingSchedules = await this.prisma.schedule.findMany({
+      where: {
+        doctorId: dto.doctorId,
+        dayOfWeek: dto.dayOfWeek,
+        isActive: true,
+      },
+    });
+
+    for (const existing of existingSchedules) {
+      if (
+        this.timesOverlap(
+          dto.startTime,
+          dto.endTime,
+          existing.startTime,
+          existing.endTime,
+        )
+      ) {
+        throw new ConflictException(
+          `El horario se solapa con un horario existente en ${this.DAY_NAMES[dto.dayOfWeek]} (${existing.startTime} - ${existing.endTime})`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Helper: Check if two time ranges overlap
+   */
+  private timesOverlap(
+    start1: string,
+    end1: string,
+    start2: string,
+    end2: string,
+  ): boolean {
+    return start1 < end2 && start2 < end1;
+  }
+
+  /**
+   * Helper: Convert time string to minutes
+   */
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 }

@@ -12,6 +12,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { SlotsModule } from './slots/slots.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { EmailModule } from './email/email.module';
+import { UnavailabilityModule } from './unavailability/unavailability.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { EmailModule } from './email/email.module';
     SlotsModule,
     CalendarModule,
     EmailModule,
+    UnavailabilityModule,
   ],
 })
 export class AppModule {}
