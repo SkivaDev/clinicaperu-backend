@@ -281,48 +281,109 @@ async function main() {
     },
   });
 
-  // ====================== SLOTS (generados a partir de schedules) ======================
-  function generateSlots(schedule: {
-    id: string;
-    startTime: string;
-    endTime: string;
-    slotMinutes: number;
-  }): Prisma.SlotCreateManyInput[] {
-    const slots: Prisma.SlotCreateManyInput[] = [];
+  const schedule3 = await prisma.schedule.create({
+    data: {
+      dayOfWeek: 5, // Viernes
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: 30,
+      doctorId: doctor1.id,
+    },
+  });
 
-    const [startHour, startMin] = schedule.startTime.split(':').map(Number);
-    const [endHour, endMin] = schedule.endTime.split(':').map(Number);
+  // ====================== SLOTS (generados automáticamente) ======================
+  // Función mejorada para generar slots para los próximos N días
+  async function generateSlotsForSchedules(daysAhead: number = 14) {
+    const schedules = await prisma.schedule.findMany({
+      where: { isActive: true },
+      include: {
+        doctor: true,
+      },
+    });
 
-    const start = new Date();
-    start.setHours(startHour, startMin, 0, 0);
+    let totalSlotsCreated = 0;
 
-    const end = new Date();
-    end.setHours(endHour, endMin, 0, 0);
-
-    let current = new Date(start);
-
-    while (current < end) {
-      const next = new Date(current.getTime() + schedule.slotMinutes * 60000);
-
-      slots.push({
-        scheduleId: schedule.id,
-        startAt: new Date(current),
-        endAt: new Date(next),
-        status: 'FREE', // 👈 ahora TS reconoce que esto es válido
+    for (const schedule of schedules) {
+      // Obtener unavailabilities del doctor
+      const unavailabilities = await prisma.doctorUnavailability.findMany({
+        where: {
+          doctorId: schedule.doctorId,
+          startAt: {
+            lte: new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000),
+          },
+          endAt: {
+            gte: new Date(),
+          },
+        },
       });
 
-      current = next;
+      const slots: Prisma.SlotCreateManyInput[] = [];
+      const startDate = new Date();
+      const endDate = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
+
+      // Encontrar todas las fechas que coinciden con el día de la semana
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        if (currentDate.getDay() === schedule.dayOfWeek) {
+          // Parsear horarios
+          const [startHour, startMin] = schedule.startTime
+            .split(':')
+            .map(Number);
+          const [endHour, endMin] = schedule.endTime.split(':').map(Number);
+
+          // Generar slots para este día
+          const dayStart = new Date(currentDate);
+          dayStart.setHours(startHour, startMin, 0, 0);
+
+          const dayEnd = new Date(currentDate);
+          dayEnd.setHours(endHour, endMin, 0, 0);
+
+          let slotStart = new Date(dayStart);
+
+          while (slotStart < dayEnd) {
+            const slotEnd = new Date(
+              slotStart.getTime() + schedule.slotMinutes * 60000,
+            );
+
+            if (slotEnd > dayEnd) break;
+
+            // Verificar si el slot se solapa con unavailabilities
+            const isUnavailable = unavailabilities.some(
+              (unavail) =>
+                slotStart < unavail.endAt && slotEnd > unavail.startAt,
+            );
+
+            if (!isUnavailable) {
+              slots.push({
+                scheduleId: schedule.id,
+                startAt: new Date(slotStart),
+                endAt: new Date(slotEnd),
+                status: 'FREE',
+                isActive: true,
+              });
+            }
+
+            slotStart = slotEnd;
+          }
+        }
+        currentDate = new Date(currentDate.getTime() + 24 * 60 * 60 * 1000);
+      }
+
+      if (slots.length > 0) {
+        const result = await prisma.slot.createMany({
+          data: slots,
+          skipDuplicates: true,
+        });
+        totalSlotsCreated += result.count;
+      }
     }
 
-    return slots;
+    return totalSlotsCreated;
   }
 
-  const slots1 = await prisma.slot.createMany({
-    data: generateSlots(schedule1),
-  });
-  const slots2 = await prisma.slot.createMany({
-    data: generateSlots(schedule2),
-  });
+  // Generar slots para los próximos 14 días
+  const slotsCreated = await generateSlotsForSchedules(14);
+  console.log(`✅ ${slotsCreated} slots generados para los próximos 14 días`);
 
   // ====================== APPOINTMENTS ======================
   const patient = await prisma.user.findFirst({

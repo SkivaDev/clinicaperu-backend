@@ -8,11 +8,16 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SlotsService, SlotAvailabilityFilter } from './slots.service';
+import { SlotGeneratorService } from './slot-generator.service';
 import { ResponseDto } from 'src/common/dto/response.dto';
+import { GenerateSlotsDto } from './dto/generate-slots.dto';
 
 @Controller('slots')
 export class SlotsController {
-  constructor(private readonly slotsService: SlotsService) {}
+  constructor(
+    private readonly slotsService: SlotsService,
+    private readonly slotGeneratorService: SlotGeneratorService,
+  ) {}
 
   @Get()
   async getAvailableSlots(
@@ -132,6 +137,29 @@ export class SlotsController {
       statusCode: HttpStatus.OK,
       message: 'Slot retrieved successfully',
       data: slot,
+    };
+  }
+
+  @Post('admin/generate')
+  async generateSlots(@Body() generateSlotsDto: GenerateSlotsDto): Promise<
+    ResponseDto<{
+      totalSlotsCreated: number;
+      totalSlotsSkipped: number;
+      schedulesProcessed: number;
+      errors: string[];
+      duration: number;
+    }>
+  > {
+    const result = await this.slotGeneratorService.generateSlotsForAllSchedules(
+      {
+        daysAhead: generateSlotsDto.daysAhead,
+      },
+    );
+
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: `Slot generation completed: ${result.totalSlotsCreated} slots created, ${result.totalSlotsSkipped} skipped`,
+      data: result,
     };
   }
 }
