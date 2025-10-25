@@ -3,9 +3,7 @@ import {
   Get,
   Post,
   Body,
-  Query,
   Param,
-  Patch,
   HttpStatus,
   UseGuards,
   Req,
@@ -37,14 +35,18 @@ import { Role, AppointmentStatus } from '@prisma/client';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
 import { BookAppointmentDto } from './dto/book-appointment.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
+import { DoctorBookAppointmentDto } from './dto/doctor-book-appointment.dto';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { CurrentUserPayload } from '../auth/types/current-user.interface';
+import { DoctorSlotOwnershipGuard } from './guards/doctor-slot-ownership.guard';
 
 @ApiTags('Gestión de Citas')
 @ApiBearerAuth('bearerAuth')
 @ApiCookieAuth('cookieAuth')
 @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
-@ApiForbiddenResponse({ description: 'Acceso denegado - Se requiere autenticación' })
+@ApiForbiddenResponse({
+  description: 'Acceso denegado - Se requiere autenticación',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('appointments')
 export class AppointmentsController {
@@ -70,7 +72,8 @@ export class AppointmentsController {
     type: ResponseDto<BookingResponseDto>,
   })
   @ApiConflictResponse({
-    description: 'El slot no está disponible o está siendo reservado por otro usuario',
+    description:
+      'El slot no está disponible o está siendo reservado por otro usuario',
   })
   @ApiBadRequestResponse({
     description: 'Datos inválidos o slot no cumple requisitos',
@@ -81,7 +84,9 @@ export class AppointmentsController {
     @Req() request: any,
   ): Promise<ResponseDto<BookingResponseDto>> {
     // Generar request ID para tracking
-    const requestId = request.headers['x-request-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const requestId =
+      request.headers['x-request-id'] ||
+      `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const appointment = await this.bookingService.bookSlot(
       user.userId,
@@ -92,6 +97,57 @@ export class AppointmentsController {
     return {
       statusCode: HttpStatus.CREATED,
       message: 'Appointment booked successfully',
+      data: appointment,
+    };
+  }
+
+  /**
+   * HU-024: Doctor Books for Patient - Doctor reserva slot para paciente
+   * POST /doctor/appointments con { slotId, patientId, reason }
+   * Reutiliza lógica transaccional de HU-023
+   */
+  @Post('doctor/appointments')
+  @Roles(Role.DOCTOR)
+  @UseGuards(DoctorSlotOwnershipGuard)
+  @ApiOperation({
+    summary: 'Doctor reserva slot para paciente',
+    description:
+      'Permite a un doctor reservar un slot de su agenda para un paciente específico. Útil para citas de seguimiento.',
+  })
+  @ApiOkResponse({
+    description: 'Cita creada exitosamente por el doctor',
+    type: ResponseDto<BookingResponseDto>,
+  })
+  @ApiConflictResponse({
+    description: 'El slot no está disponible o no pertenece al doctor',
+  })
+  @ApiBadRequestResponse({
+    description: 'Datos inválidos o slot no cumple requisitos',
+  })
+  @ApiForbiddenResponse({
+    description: 'El slot no pertenece al doctor autenticado',
+  })
+  async doctorBookAppointment(
+    @Body() bookingDto: DoctorBookAppointmentDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @Req() request: any,
+  ): Promise<ResponseDto<BookingResponseDto>> {
+    // Generar request ID para tracking
+    const requestId =
+      request.headers['x-request-id'] ||
+      `req_doctor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const appointment = await this.bookingService.bookSlotForPatient(
+      bookingDto.patientId,
+      bookingDto.slotId,
+      bookingDto.reason,
+      bookingDto.notes,
+      requestId,
+    );
+
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: 'Appointment booked successfully by doctor',
       data: appointment,
     };
   }
@@ -111,22 +167,22 @@ export class AppointmentsController {
   //   }
   @Get(':id')
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtener cita por ID',
-    description: 'Obtiene los detalles de una cita específica por su ID'
+    description: 'Obtiene los detalles de una cita específica por su ID',
   })
   @ApiParam({
     name: 'id',
     description: 'ID único de la cita',
-    example: 'uuid-here'
+    example: 'uuid-here',
   })
   @ApiOkResponse({
     description: 'Cita obtenida exitosamente',
-    type: ResponseDto<AppointmentResponseDto>
+    type: ResponseDto<AppointmentResponseDto>,
   })
   @ApiResponse({
     status: 404,
-    description: 'Cita no encontrada'
+    description: 'Cita no encontrada',
   })
   async getAppointmentById(
     @Param('id') id: string,
@@ -142,13 +198,13 @@ export class AppointmentsController {
 
   @Get()
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar todas las citas',
-    description: 'Obtiene la lista completa de citas del sistema'
+    description: 'Obtiene la lista completa de citas del sistema',
   })
   @ApiOkResponse({
     description: 'Lista de citas obtenida exitosamente',
-    type: ResponseDto<AppointmentResponseDto[]>
+    type: ResponseDto<AppointmentResponseDto[]>,
   })
   async getAllAppointments(): Promise<ResponseDto<AppointmentResponseDto[]>> {
     const appointments = await this.appointmentsService.getAllAppointments();

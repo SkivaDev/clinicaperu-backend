@@ -3,11 +3,12 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 import { BookingService } from './booking.service';
+import { DoctorSlotOwnershipGuard } from './guards/doctor-slot-ownership.guard';
 
 @Module({
   imports: [PrismaModule],
   controllers: [AppointmentsController],
-  providers: [AppointmentsService, BookingService],
+  providers: [AppointmentsService, BookingService, DoctorSlotOwnershipGuard],
   exports: [AppointmentsService, BookingService],
 })
 export class AppointmentsModule {}

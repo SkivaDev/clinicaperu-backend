@@ -21,7 +21,7 @@ export class BookingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * HU-023: Atomic Booking - Reserva un slot de forma atómica
+   * HU-023: Atomic Booking - Reserva un slot de forma atómica (Patient)
    * Garantiza que solo un paciente pueda reservar un slot específico
    * Maneja concurrencia con FOR UPDATE y retry en deadlocks
    */
@@ -70,6 +70,69 @@ export class BookingService {
     // Si llegamos aquí, se agotaron los reintentos
     this.logger.error(
       `${logContext} Booking failed after ${this.MAX_RETRIES} retries`,
+    );
+    throw new InternalServerErrorException(
+      'Booking failed due to high concurrency. Please try again.',
+    );
+  }
+
+  /**
+   * HU-024: Doctor Books for Patient - Doctor reserva slot para un paciente
+   * Reutiliza la misma lógica transaccional que HU-023
+   * Validación adicional: el slot debe pertenecer al doctor
+   */
+  async bookSlotForPatient(
+    patientId: string,
+    slotId: string,
+    reason: string,
+    notes: string | undefined,
+    requestId?: string,
+  ): Promise<BookingResponseDto> {
+    const logContext = requestId ? `[${requestId}]` : '';
+    this.logger.log(
+      `${logContext} Doctor booking slot ${slotId} for patient ${patientId}`,
+    );
+
+    // Reutilizar la misma lógica de booking
+    const bookingDto: BookAppointmentDto = {
+      slotId,
+      reason,
+      notes,
+    };
+
+    let attempt = 0;
+    let lastError: Error | null = null;
+
+    while (attempt <= this.MAX_RETRIES) {
+      try {
+        const result = await this.executeBookingTransaction(
+          patientId,
+          bookingDto,
+          requestId,
+        );
+        this.logger.log(
+          `${logContext} Doctor booking completed successfully: appointment ${result.id}`,
+        );
+        return result;
+      } catch (error) {
+        lastError = error;
+
+        // Si es un deadlock, reintentar
+        if (this.isDeadlockError(error) && attempt < this.MAX_RETRIES) {
+          attempt++;
+          this.logger.warn(
+            `${logContext} Deadlock detected, retrying (attempt ${attempt}/${this.MAX_RETRIES})`,
+          );
+          await this.sleep(this.RETRY_DELAY * attempt);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    this.logger.error(
+      `${logContext} Doctor booking failed after ${this.MAX_RETRIES} retries`,
     );
     throw new InternalServerErrorException(
       'Booking failed due to high concurrency. Please try again.',
