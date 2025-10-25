@@ -8,6 +8,7 @@ import {
   Patch,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,8 +20,11 @@ import {
   ApiUnauthorizedResponse,
   ApiOkResponse,
   ApiForbiddenResponse,
+  ApiConflictResponse,
+  ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { AppointmentsService } from './appointments.service';
+import { BookingService } from './booking.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CalendarQueryDto } from './dto/calendar-query.dto';
 import { CalendarEventDto } from './dto/calendar-event.dto';
@@ -31,6 +35,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role, AppointmentStatus } from '@prisma/client';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
+import { BookAppointmentDto } from './dto/book-appointment.dto';
+import { BookingResponseDto } from './dto/booking-response.dto';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import type { CurrentUserPayload } from '../auth/types/current-user.interface';
 
 @ApiTags('Gestión de Citas')
 @ApiBearerAuth('bearerAuth')
@@ -40,22 +48,53 @@ import { AppointmentResponseDto } from './dto/appointment-response.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('appointments')
 export class AppointmentsController {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(
+    private readonly appointmentsService: AppointmentsService,
+    private readonly bookingService: BookingService,
+  ) {}
 
-  //   @Post()
-  //   @Roles(Role.PATIENT, Role.ADMIN)
-  //   async createAppointment(
-  //     @Body() createAppointmentDto: CreateAppointmentDto,
-  //   ): Promise<ResponseDto<AppointmentEntity>> {
-  //     const appointment =
-  //       await this.appointmentsService.createAppointment(createAppointmentDto);
+  /**
+   * HU-023: Atomic Booking - Reserva un slot de forma atómica
+   * POST /appointments con { slotId, reason }
+   * Garantiza que solo un paciente pueda reservar un slot
+   */
+  @Post()
+  @Roles(Role.PATIENT, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Reservar un slot (Atomic Booking)',
+    description:
+      'Crea una cita reservando un slot de forma atómica. Maneja concurrencia con transacciones y locks.',
+  })
+  @ApiOkResponse({
+    description: 'Cita creada exitosamente',
+    type: ResponseDto<BookingResponseDto>,
+  })
+  @ApiConflictResponse({
+    description: 'El slot no está disponible o está siendo reservado por otro usuario',
+  })
+  @ApiBadRequestResponse({
+    description: 'Datos inválidos o slot no cumple requisitos',
+  })
+  async bookAppointment(
+    @Body() bookingDto: BookAppointmentDto,
+    @CurrentUser() user: CurrentUserPayload,
+    @Req() request: any,
+  ): Promise<ResponseDto<BookingResponseDto>> {
+    // Generar request ID para tracking
+    const requestId = request.headers['x-request-id'] || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  //     return {
-  //       statusCode: HttpStatus.CREATED,
-  //       message: 'Appointment created successfully',
-  //       data: appointment,
-  //     };
-  //   }
+    const appointment = await this.bookingService.bookSlot(
+      user.userId,
+      bookingDto,
+      requestId,
+    );
+
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: 'Appointment booked successfully',
+      data: appointment,
+    };
+  }
 
   //   @Get('calendar')
   //   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
