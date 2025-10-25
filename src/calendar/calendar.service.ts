@@ -8,7 +8,14 @@ import {
   GetCalendarQueryDto,
 } from './dto/get-calendar-query.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, SlotStatus } from '@prisma/client';
+import { Prisma, SlotStatus, AppointmentStatus } from '@prisma/client';
+import { CalendarQueryDto } from './dto/calendar-query.dto';
+import {
+  CalendarEventsResponseDto,
+  CalendarEventDto,
+  DoctorInfoDto,
+  PatientInfoDto,
+} from './dto/calendar-event.dto';
 
 @Injectable()
 export class CalendarService {
@@ -266,6 +273,208 @@ export class CalendarService {
       dateRange,
       slots,
       summary,
+    };
+  }
+
+  /**
+   * HU-022: API de Calendario - Obtiene slots y appointments en formato calendario
+   * Retorna eventos combinados de slots y appointments con filtros avanzados
+   */
+  async getCalendarEvents(
+    query: CalendarQueryDto,
+  ): Promise<CalendarEventsResponseDto> {
+    const {
+      doctorId,
+      patientId,
+      start,
+      end,
+      status,
+      appointmentStatus,
+      limit = 500,
+      offset = 0,
+    } = query;
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    // Query builder para slots
+    const slotWhere: Prisma.SlotWhereInput = {
+      startAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+      isActive: true,
+    };
+
+    // Filtrar por doctor
+    if (doctorId) {
+      slotWhere.schedule = {
+        doctorId,
+      };
+    }
+
+    // Filtrar por status de slot
+    if (status) {
+      slotWhere.status = status;
+    }
+
+    // Query builder para appointments
+    const appointmentWhere: Prisma.AppointmentWhereInput = {
+      slot: {
+        startAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    };
+
+    // Filtrar por paciente
+    if (patientId) {
+      appointmentWhere.userId = patientId;
+    }
+
+    // Filtrar por doctor en appointments
+    if (doctorId) {
+      appointmentWhere.doctorId = doctorId;
+    }
+
+    // Filtrar por status de appointment
+    if (appointmentStatus) {
+      appointmentWhere.status = appointmentStatus;
+    }
+
+    // Ejecutar queries en paralelo
+    const [slots, appointments] = await Promise.all([
+      this.prisma.slot.findMany({
+        where: slotWhere,
+        include: {
+          schedule: {
+            include: {
+              doctor: {
+                include: {
+                  user: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          startAt: 'asc',
+        },
+      }),
+      this.prisma.appointment.findMany({
+        where: appointmentWhere,
+        include: {
+          slot: {
+            include: {
+              schedule: {
+                include: {
+                  doctor: {
+                    include: {
+                      user: {
+                        select: {
+                          firstName: true,
+                          lastName: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: {
+          slot: {
+            startAt: 'asc',
+          },
+        },
+      }),
+    ]);
+
+    // Transformar slots a eventos
+    const slotEvents: CalendarEventDto[] = slots
+      .filter((slot) => slot.status === SlotStatus.FREE) // Solo slots libres
+      .map((slot) => this.transformSlotToEvent(slot));
+
+    // Transformar appointments a eventos
+    const appointmentEvents: CalendarEventDto[] = appointments.map(
+      (appointment) => this.transformAppointmentToEvent(appointment),
+    );
+
+    // Combinar y ordenar eventos
+    const allEvents = [...slotEvents, ...appointmentEvents].sort(
+      (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+    );
+
+    // Aplicar paginación
+    const paginatedEvents = allEvents.slice(offset, offset + limit);
+
+    // Calcular metadata
+    const totalSlots = slots.length;
+    const bookedSlots = appointments.length;
+
+    return {
+      events: paginatedEvents,
+      meta: {
+        totalSlots,
+        bookedSlots,
+      },
+    };
+  }
+
+  /**
+   * Transforma un Slot en un CalendarEventDto
+   */
+  private transformSlotToEvent(slot: any): CalendarEventDto {
+    const doctorName = `${slot.schedule.doctor.user.firstName} ${slot.schedule.doctor.user.lastName}`;
+
+    return {
+      id: slot.id,
+      type: 'slot',
+      start: slot.startAt.toISOString(),
+      end: slot.endAt.toISOString(),
+      status: slot.status,
+      doctor: {
+        id: slot.schedule.doctor.id,
+        name: doctorName,
+      },
+    };
+  }
+
+  /**
+   * Transforma un Appointment en un CalendarEventDto
+   */
+  private transformAppointmentToEvent(appointment: any): CalendarEventDto {
+    const doctorName = `${appointment.slot.schedule.doctor.user.firstName} ${appointment.slot.schedule.doctor.user.lastName}`;
+    const patientName = `${appointment.user.firstName} ${appointment.user.lastName}`;
+
+    return {
+      id: appointment.id,
+      type: 'appointment',
+      start: appointment.slot.startAt.toISOString(),
+      end: appointment.slot.endAt.toISOString(),
+      status: appointment.status,
+      doctor: {
+        id: appointment.slot.schedule.doctor.id,
+        name: doctorName,
+      },
+      patient: {
+        id: appointment.user.id,
+        name: patientName,
+      },
     };
   }
 

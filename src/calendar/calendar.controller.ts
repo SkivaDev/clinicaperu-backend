@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   HttpStatus,
+  UseInterceptors,
 } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
@@ -22,6 +23,9 @@ import { CalendarResponseDto } from './dto/calendar-response.dto';
 import { ResponseDto } from 'src/common/dto/response.dto';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import type { CurrentUserPayload } from 'src/auth/types/current-user.interface';
+import { CalendarQueryDto } from './dto/calendar-query.dto';
+import { CalendarEventsResponseDto } from './dto/calendar-event.dto';
+import { CacheInterceptor } from 'src/common/interceptors/cache.interceptor';
 
 @Controller('calendar')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -82,6 +86,26 @@ export class CalendarController {
       statusCode: HttpStatus.OK,
       message: 'Patient calendar found successfully',
       data: calendar,
+    };
+  }
+
+  /**
+   * HU-022: API de Calendario - Obtiene eventos (slots + appointments)
+   * GET /calendar?doctorId=&patientId=&start=&end=&status=
+   * Retorna slots libres y appointments en formato unificado
+   * Cache: 60s TTL
+   */
+  @Get('events')
+  @Roles(Role.DOCTOR, Role.PATIENT, Role.ADMIN)
+  @UseInterceptors(new CacheInterceptor(60000)) // 60 segundos de cache
+  async getCalendarEvents(
+    @Query() query: CalendarQueryDto,
+  ): Promise<ResponseDto<CalendarEventsResponseDto>> {
+    const events = await this.calendarService.getCalendarEvents(query);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Calendar events retrieved successfully',
+      data: events,
     };
   }
 }
