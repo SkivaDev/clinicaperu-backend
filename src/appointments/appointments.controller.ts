@@ -7,6 +7,8 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  Delete,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,6 +38,7 @@ import { AppointmentResponseDto } from './dto/appointment-response.dto';
 import { BookAppointmentDto } from './dto/book-appointment.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
 import { DoctorBookAppointmentDto } from './dto/doctor-book-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { CurrentUserPayload } from '../auth/types/current-user.interface';
 import { DoctorSlotOwnershipGuard } from './guards/doctor-slot-ownership.guard';
@@ -199,15 +202,20 @@ export class AppointmentsController {
   @Get()
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
   @ApiOperation({
-    summary: 'Listar todas las citas',
-    description: 'Obtiene la lista completa de citas del sistema',
+    summary: 'Listar mis citas',
+    description:
+      'Obtiene las citas del usuario autenticado. Pacientes ven solo sus citas, doctores ven las citas de sus pacientes, admins ven todas.',
   })
   @ApiOkResponse({
     description: 'Lista de citas obtenida exitosamente',
-    type: ResponseDto<AppointmentResponseDto[]>,
   })
-  async getAllAppointments(): Promise<ResponseDto<AppointmentResponseDto[]>> {
-    const appointments = await this.appointmentsService.getAllAppointments();
+  async getMyAppointments(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<any[]>> {
+    const appointments = await this.appointmentsService.getMyAppointments(
+      user.userId,
+      user.role,
+    );
 
     return {
       statusCode: HttpStatus.OK,
@@ -233,4 +241,107 @@ export class AppointmentsController {
   //       data: appointment,
   //     };
   //   }
+
+  /**
+   * HU-026: DELETE /appointments/:id - Cancelar cita
+   * Validación: solo si startAt > now + 24h (paciente)
+   * Doctor y Admin pueden cancelar sin restricción de tiempo
+   */
+  @Delete(':id')
+  @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Cancelar una cita',
+    description:
+      'Cancela una cita existente. Los pacientes solo pueden cancelar con más de 24h de anticipación. Doctores y admins pueden cancelar sin restricción.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único de la cita a cancelar',
+    example: 'uuid-here',
+  })
+  @ApiOkResponse({
+    description: 'Cita cancelada exitosamente',
+    type: ResponseDto<AppointmentResponseDto>,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'No se puede cancelar citas con menos de 24h de anticipación o la cita ya está cancelada/atendida',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para cancelar esta cita',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cita no encontrada',
+  })
+  async cancelAppointment(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<AppointmentResponseDto>> {
+    const appointment = await this.appointmentsService.cancelAppointment(
+      id,
+      user.userId,
+      user.role,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Cita cancelada exitosamente',
+      data: appointment,
+    };
+  }
+
+  /**
+   * HU-026: PUT /appointments/:id/reschedule - Reprogramar cita
+   * Validación: solo si startAt > now + 24h
+   * Solo el paciente propietario o un admin pueden reprogramar
+   */
+  @Put(':id/reschedule')
+  @Roles(Role.PATIENT, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Reprogramar una cita',
+    description:
+      'Reprograma una cita a un nuevo slot. Solo se puede reprogramar con más de 24h de anticipación.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único de la cita a reprogramar',
+    example: 'uuid-here',
+  })
+  @ApiOkResponse({
+    description: 'Cita reprogramada exitosamente',
+    type: ResponseDto<AppointmentResponseDto>,
+  })
+  @ApiConflictResponse({
+    description: 'El nuevo slot ya está reservado',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'No se puede reprogramar citas con menos de 24h o el nuevo slot no pertenece al mismo doctor',
+  })
+  @ApiForbiddenResponse({
+    description: 'Solo el paciente puede reprogramar su cita',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cita o nuevo slot no encontrado',
+  })
+  async rescheduleAppointment(
+    @Param('id') id: string,
+    @Body() dto: RescheduleAppointmentDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<AppointmentResponseDto>> {
+    const appointment = await this.appointmentsService.rescheduleAppointment(
+      id,
+      user.userId,
+      user.role,
+      dto,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Cita reprogramada exitosamente',
+      data: appointment,
+    };
+  }
 }
