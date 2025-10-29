@@ -143,7 +143,7 @@ export class BookingService {
    * Ejecuta la transacción de booking con todas las validaciones
    */
   private async executeBookingTransaction(
-    userId: string,
+    patientId: string,
     bookingDto: BookAppointmentDto,
     requestId?: string,
   ): Promise<BookingResponseDto> {
@@ -154,11 +154,13 @@ export class BookingService {
       const result = await this.prisma.$transaction(
         async (tx) => {
           // 1. SELECT FOR UPDATE NOWAIT - Lock pesimista del slot
-          // Usamos queryRaw para tener control total del lock
+          // Usamos queryRaw para tener control total del lock con JOIN para obtener doctorId
           const slots = await tx.$queryRaw<any[]>`
-            SELECT * FROM "Slot" 
-            WHERE id = ${bookingDto.slotId}
-            FOR UPDATE NOWAIT
+            SELECT s.*, sc."doctorId" as "doctorId"
+            FROM "Slot" s
+            INNER JOIN "Schedule" sc ON s."scheduleId" = sc.id
+            WHERE s.id = ${bookingDto.slotId}
+            FOR UPDATE OF s NOWAIT
           `;
 
           if (!slots || slots.length === 0) {
@@ -171,7 +173,7 @@ export class BookingService {
           this.validateSlot(slot, logContext);
 
           // 3. Validar límite de citas del paciente (opcional)
-          await this.validatePatientLimit(tx, userId, slot.doctorId, logContext);
+          await this.validatePatientLimit(tx, patientId, slot.doctorId, logContext);
 
           // 4. Obtener información del doctor para la respuesta
           const doctor = await tx.doctor.findUnique({
@@ -204,7 +206,7 @@ export class BookingService {
           // 5. Crear la cita
           const appointment = await tx.appointment.create({
             data: {
-              userId,
+              userId: patientId,
               doctorId: slot.doctorId,
               slotId: bookingDto.slotId,
               reason: bookingDto.reason,
@@ -225,7 +227,7 @@ export class BookingService {
           await this.enqueueConfirmationEmail(
             tx,
             appointment.id,
-            userId,
+            patientId,
             slot,
             logContext,
           );
@@ -234,7 +236,7 @@ export class BookingService {
           await this.logBookingAudit(
             tx,
             appointment.id,
-            userId,
+            patientId,
             bookingDto.slotId,
             requestId,
           );

@@ -34,8 +34,12 @@ export class DoctorSlotOwnershipGuard implements CanActivate {
       where: { id: body.slotId },
       include: {
         schedule: {
-          select: {
-            doctorId: true,
+          include: {
+            doctor: {
+              select: {
+                userId: true,
+              },
+            },
           },
         },
       },
@@ -46,7 +50,7 @@ export class DoctorSlotOwnershipGuard implements CanActivate {
     }
 
     // Verificar que el slot pertenece al doctor autenticado
-    if (slot.schedule.doctorId !== user.doctorId) {
+    if (slot.schedule.doctor.userId !== user.userId) {
       throw new ForbiddenException(
         'You can only book appointments for your own slots',
       );
