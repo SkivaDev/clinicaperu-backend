@@ -73,7 +73,7 @@ async function main() {
   });
 
   // ========== CLÍNICA 3: Policlínico Norte ==========
-  const clinic3 = await prisma.clinic.upsert({
+  await prisma.clinic.upsert({
     where: { name: 'Policlínico Norte' },
     update: {},
     create: {
@@ -182,7 +182,7 @@ async function main() {
     create: {
       name: 'Pediatría',
       description:
-        'Especialidad médica que se encarga de la prevención, diagnóstico y tratamiento de enfermedades del corazón y vasos sanguíneos.',
+        'Especialidad médica que se encarga del cuidado integral de la salud de niños y adolescentes desde el nacimiento hasta los 18 años.',
     },
   });
 
@@ -192,8 +192,295 @@ async function main() {
     create: {
       name: 'Ginecología',
       description:
-        'Especialidad médica que se encarga de la prevención, diagnóstico y tratamiento de enfermedades del corazón y vasos sanguíneos.',
+        'Especialidad médica que se centra en la salud del sistema reproductor femenino y el tratamiento de enfermedades ginecológicas.',
     },
+  });
+
+  const traumatologia = await prisma.specialty.upsert({
+    where: { name: 'Traumatología' },
+    update: {},
+    create: {
+      name: 'Traumatología',
+      description:
+        'Especialidad que trata lesiones del sistema musculoesquelético, fracturas, luxaciones y traumatismos.',
+    },
+  });
+
+  const dermatologia = await prisma.specialty.upsert({
+    where: { name: 'Dermatología' },
+    update: {},
+    create: {
+      name: 'Dermatología',
+      description:
+        'Especialidad médica dedicada al diagnóstico y tratamiento de enfermedades de la piel, cabello y uñas.',
+    },
+  });
+
+  const oftalmologia = await prisma.specialty.upsert({
+    where: { name: 'Oftalmología' },
+    update: {},
+    create: {
+      name: 'Oftalmología',
+      description:
+        'Especialidad médica que estudia y trata las enfermedades del ojo y sus anexos.',
+    },
+  });
+
+  const neurologia = await prisma.specialty.upsert({
+    where: { name: 'Neurología' },
+    update: {},
+    create: {
+      name: 'Neurología',
+      description:
+        'Especialidad que se ocupa del diagnóstico y tratamiento de enfermedades del sistema nervioso.',
+    },
+  });
+
+  const psiquiatria = await prisma.specialty.upsert({
+    where: { name: 'Psiquiatría' },
+    update: {},
+    create: {
+      name: 'Psiquiatría',
+      description:
+        'Especialidad médica dedicada al estudio, diagnóstico y tratamiento de trastornos mentales.',
+    },
+  });
+
+  const otorrinolaringologia = await prisma.specialty.upsert({
+    where: { name: 'Otorrinolaringología' },
+    update: {},
+    create: {
+      name: 'Otorrinolaringología',
+      description:
+        'Especialidad que trata enfermedades del oído, nariz y garganta.',
+    },
+  });
+
+  const urologia = await prisma.specialty.upsert({
+    where: { name: 'Urología' },
+    update: {},
+    create: {
+      name: 'Urología',
+      description:
+        'Especialidad que se encarga del estudio y tratamiento del aparato urinario y reproductor masculino.',
+    },
+  });
+
+  const endocrinologia = await prisma.specialty.upsert({
+    where: { name: 'Endocrinología' },
+    update: {},
+    create: {
+      name: 'Endocrinología',
+      description:
+        'Especialidad que estudia las hormonas y trata enfermedades del sistema endocrino.',
+    },
+  });
+
+  // ========== MÁS PACIENTES ==========
+  const patient2Password = await bcrypt.hash('patient123', 10);
+  const patient2 = await prisma.user.upsert({
+    where: { email: 'maria.lopez@example.com' },
+    update: {},
+    create: {
+      email: 'maria.lopez@example.com',
+      passwordHash: patient2Password,
+      dni: '45678901',
+      firstName: 'María',
+      lastName: 'López Sánchez',
+      dayOfBirth: new Date('1995-08-15'),
+      gender: 'FEMALE',
+      role: 'PATIENT',
+      phone: '+51987654321',
+    },
+  });
+
+  const patient3 = await prisma.user.upsert({
+    where: { email: 'carlos.torres@example.com' },
+    update: {},
+    create: {
+      email: 'carlos.torres@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '56789012',
+      firstName: 'Carlos',
+      lastName: 'Torres Mendoza',
+      dayOfBirth: new Date('1988-03-20'),
+      gender: 'MALE',
+      role: 'PATIENT',
+      phone: '+51998765432',
+    },
+  });
+
+  const patient4 = await prisma.user.upsert({
+    where: { email: 'ana.rodriguez@example.com' },
+    update: {},
+    create: {
+      email: 'ana.rodriguez@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '67890123',
+      firstName: 'Ana',
+      lastName: 'Rodríguez Flores',
+      dayOfBirth: new Date('1992-11-05'),
+      gender: 'FEMALE',
+      role: 'PATIENT',
+      phone: '+51976543210',
+    },
+  });
+
+  const patient5 = await prisma.user.upsert({
+    where: { email: 'pedro.martinez@example.com' },
+    update: {},
+    create: {
+      email: 'pedro.martinez@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '78901234',
+      firstName: 'Pedro',
+      lastName: 'Martínez Díaz',
+      dayOfBirth: new Date('1985-06-12'),
+      gender: 'MALE',
+      role: 'PATIENT',
+    },
+  });
+
+  const patient6 = await prisma.user.upsert({
+    where: { email: 'lucia.garcia@example.com' },
+    update: {},
+    create: {
+      email: 'lucia.garcia@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '89012345',
+      firstName: 'Lucía',
+      lastName: 'García Pérez',
+      dayOfBirth: new Date('1998-09-25'),
+      gender: 'FEMALE',
+      role: 'PATIENT',
+      phone: '+51965432109',
+    },
+  });
+
+  const patient7 = await prisma.user.upsert({
+    where: { email: 'roberto.silva@example.com' },
+    update: {},
+    create: {
+      email: 'roberto.silva@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '90123456',
+      firstName: 'Roberto',
+      lastName: 'Silva Castro',
+      dayOfBirth: new Date('1975-02-18'),
+      gender: 'MALE',
+      role: 'PATIENT',
+    },
+  });
+
+  const patient8 = await prisma.user.upsert({
+    where: { email: 'sofia.ramirez@example.com' },
+    update: {},
+    create: {
+      email: 'sofia.ramirez@example.com',
+      passwordHash: await bcrypt.hash('patient123', 10),
+      dni: '01234567',
+      firstName: 'Sofía',
+      lastName: 'Ramírez Luna',
+      dayOfBirth: new Date('2005-12-30'),
+      gender: 'FEMALE',
+      role: 'PATIENT',
+      phone: '+51954321098',
+    },
+  });
+
+  // ========== MÁS ROOMS PARA OTRAS CLÍNICAS ==========
+  await prisma.room.createMany({
+    data: [
+      // Rooms para Centro Médico El Sol (clinic2)
+      {
+        name: 'Consultorio A1',
+        roomNumber: 'A1',
+        roomType: 'CONSULTATION',
+        floor: 1,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla', 'Computadora'],
+        clinicId: clinic2.id,
+      },
+      {
+        name: 'Consultorio A2',
+        roomNumber: 'A2',
+        roomType: 'CONSULTATION',
+        floor: 1,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla', 'Oftalmoscopio'],
+        clinicId: clinic2.id,
+      },
+      {
+        name: 'Sala de Emergencias',
+        roomNumber: 'ER-1',
+        roomType: 'EMERGENCY',
+        floor: 1,
+        capacity: 3,
+        equipment: ['Desfibrilador', 'Monitor', 'Camillas'],
+        clinicId: clinic2.id,
+      },
+      // Rooms para Clínica Internacional (clinic4)
+      {
+        name: 'Consultorio 401',
+        roomNumber: '401',
+        roomType: 'CONSULTATION',
+        floor: 4,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla', 'Tensiómetro'],
+        clinicId: clinic4.id,
+      },
+      {
+        name: 'Consultorio 402',
+        roomNumber: '402',
+        roomType: 'CONSULTATION',
+        floor: 4,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla', 'Nebulizador'],
+        clinicId: clinic4.id,
+      },
+      {
+        name: 'UCI Principal',
+        roomNumber: 'ICU-1',
+        roomType: 'ICU',
+        floor: 5,
+        capacity: 8,
+        equipment: [
+          'Ventiladores',
+          'Monitores cardíacos',
+          'Bombas de infusión',
+        ],
+        clinicId: clinic4.id,
+      },
+      {
+        name: 'Sala de Radiología',
+        roomNumber: 'RAD-1',
+        roomType: 'RADIOLOGY',
+        floor: 2,
+        capacity: 2,
+        equipment: ['Equipo de rayos X', 'Ecógrafo', 'Tomógrafo'],
+        clinicId: clinic4.id,
+      },
+      // Rooms para Centro de Salud Esperanza (clinic5)
+      {
+        name: 'Consultorio General 1',
+        roomNumber: 'CG-1',
+        roomType: 'CONSULTATION',
+        floor: 1,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla'],
+        clinicId: clinic5.id,
+      },
+      {
+        name: 'Consultorio General 2',
+        roomNumber: 'CG-2',
+        roomType: 'CONSULTATION',
+        floor: 1,
+        capacity: 1,
+        equipment: ['Escritorio', 'Camilla', 'Estetoscopio'],
+        clinicId: clinic5.id,
+      },
+    ],
+    skipDuplicates: true,
   });
 
   // ========== DOCTOR 1 ==========
@@ -260,6 +547,276 @@ async function main() {
     },
   });
 
+  // ========== DOCTOR 3: Ginecóloga ==========
+  const doctor3User = await prisma.user.upsert({
+    where: { email: 'dra.fernandez@example.com' },
+    update: {},
+    create: {
+      email: 'dra.fernandez@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '11223344',
+      firstName: 'Laura',
+      lastName: 'Fernández Vega',
+      dayOfBirth: new Date('1982-09-14'),
+      gender: 'FEMALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor3 = await prisma.doctor.upsert({
+    where: { cmp: 11111 },
+    update: {},
+    create: {
+      cmp: 11111,
+      userId: doctor3User.id,
+      clinicId: clinic2.id,
+      specialtyId: ginecologia.id,
+      yearsOfExperience: 12,
+      consultationPrice: 140.0,
+      rating: 4.8,
+    },
+  });
+
+  // ========== DOCTOR 4: Traumatólogo ==========
+  const doctor4User = await prisma.user.upsert({
+    where: { email: 'dr.gonzalez@example.com' },
+    update: {},
+    create: {
+      email: 'dr.gonzalez@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '22334455',
+      firstName: 'Miguel',
+      lastName: 'González Ríos',
+      dayOfBirth: new Date('1978-05-20'),
+      gender: 'MALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor4 = await prisma.doctor.upsert({
+    where: { cmp: 22222 },
+    update: {},
+    create: {
+      cmp: 22222,
+      userId: doctor4User.id,
+      clinicId: clinic4.id,
+      specialtyId: traumatologia.id,
+      yearsOfExperience: 18,
+      consultationPrice: 160.0,
+      rating: 4.6,
+    },
+  });
+
+  // ========== DOCTOR 5: Dermatóloga ==========
+  const doctor5User = await prisma.user.upsert({
+    where: { email: 'dra.sanchez@example.com' },
+    update: {},
+    create: {
+      email: 'dra.sanchez@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '33445566',
+      firstName: 'Patricia',
+      lastName: 'Sánchez Morales',
+      dayOfBirth: new Date('1987-01-08'),
+      gender: 'FEMALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor5 = await prisma.doctor.upsert({
+    where: { cmp: 33333 },
+    update: {},
+    create: {
+      cmp: 33333,
+      userId: doctor5User.id,
+      clinicId: clinic.id,
+      specialtyId: dermatologia.id,
+      yearsOfExperience: 8,
+      consultationPrice: 130.0,
+      rating: 4.3,
+    },
+  });
+
+  // ========== DOCTOR 6: Oftalmólogo ==========
+  const doctor6User = await prisma.user.upsert({
+    where: { email: 'dr.herrera@example.com' },
+    update: {},
+    create: {
+      email: 'dr.herrera@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '55667788',
+      firstName: 'Jorge',
+      lastName: 'Herrera Castro',
+      dayOfBirth: new Date('1975-11-22'),
+      gender: 'MALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor6 = await prisma.doctor.upsert({
+    where: { cmp: 44444 },
+    update: {},
+    create: {
+      cmp: 44444,
+      userId: doctor6User.id,
+      clinicId: clinic2.id,
+      specialtyId: oftalmologia.id,
+      yearsOfExperience: 20,
+      consultationPrice: 150.0,
+      rating: 4.9,
+    },
+  });
+
+  // ========== DOCTOR 7: Neurólogo ==========
+  const doctor7User = await prisma.user.upsert({
+    where: { email: 'dr.mendoza@example.com' },
+    update: {},
+    create: {
+      email: 'dr.mendoza@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '66778899',
+      firstName: 'Ricardo',
+      lastName: 'Mendoza Silva',
+      dayOfBirth: new Date('1980-04-15'),
+      gender: 'MALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor7 = await prisma.doctor.upsert({
+    where: { cmp: 55555 },
+    update: {},
+    create: {
+      cmp: 55555,
+      userId: doctor7User.id,
+      clinicId: clinic4.id,
+      specialtyId: neurologia.id,
+      yearsOfExperience: 16,
+      consultationPrice: 180.0,
+      rating: 4.7,
+    },
+  });
+
+  // ========== DOCTOR 8: Psiquiatra ==========
+  const doctor8User = await prisma.user.upsert({
+    where: { email: 'dra.ortiz@example.com' },
+    update: {},
+    create: {
+      email: 'dra.ortiz@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '77889900',
+      firstName: 'Elena',
+      lastName: 'Ortiz Paredes',
+      dayOfBirth: new Date('1984-07-30'),
+      gender: 'FEMALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor8 = await prisma.doctor.upsert({
+    where: { cmp: 66666 },
+    update: {},
+    create: {
+      cmp: 66666,
+      userId: doctor8User.id,
+      clinicId: clinic.id,
+      specialtyId: psiquiatria.id,
+      yearsOfExperience: 11,
+      consultationPrice: 170.0,
+      rating: 4.5,
+    },
+  });
+
+  // ========== DOCTOR 9: Otorrinolaringólogo ==========
+  const doctor9User = await prisma.user.upsert({
+    where: { email: 'dr.vargas@example.com' },
+    update: {},
+    create: {
+      email: 'dr.vargas@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '88990011',
+      firstName: 'Andrés',
+      lastName: 'Vargas Luna',
+      dayOfBirth: new Date('1979-12-05'),
+      gender: 'MALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor9 = await prisma.doctor.upsert({
+    where: { cmp: 77777 },
+    update: {},
+    create: {
+      cmp: 77777,
+      userId: doctor9User.id,
+      clinicId: clinic5.id,
+      specialtyId: otorrinolaringologia.id,
+      yearsOfExperience: 14,
+      consultationPrice: 125.0,
+      rating: 4.4,
+    },
+  });
+
+  // ========== DOCTOR 10: Urólogo ==========
+  const doctor10User = await prisma.user.upsert({
+    where: { email: 'dr.castro@example.com' },
+    update: {},
+    create: {
+      email: 'dr.castro@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '99001122',
+      firstName: 'Fernando',
+      lastName: 'Castro Medina',
+      dayOfBirth: new Date('1981-02-28'),
+      gender: 'MALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor10 = await prisma.doctor.upsert({
+    where: { cmp: 88888 },
+    update: {},
+    create: {
+      cmp: 88888,
+      userId: doctor10User.id,
+      clinicId: clinic4.id,
+      specialtyId: urologia.id,
+      yearsOfExperience: 13,
+      consultationPrice: 155.0,
+      rating: 4.6,
+    },
+  });
+
+  // ========== DOCTOR 11: Endocrinóloga ==========
+  const doctor11User = await prisma.user.upsert({
+    where: { email: 'dra.rojas@example.com' },
+    update: {},
+    create: {
+      email: 'dra.rojas@example.com',
+      passwordHash: await bcrypt.hash('doctor123', 10),
+      dni: '10111213',
+      firstName: 'Daniela',
+      lastName: 'Rojas Torres',
+      dayOfBirth: new Date('1986-08-17'),
+      gender: 'FEMALE',
+      role: 'DOCTOR',
+    },
+  });
+
+  const doctor11 = await prisma.doctor.upsert({
+    where: { cmp: 99999 },
+    update: {},
+    create: {
+      cmp: 99999,
+      userId: doctor11User.id,
+      clinicId: clinic2.id,
+      specialtyId: endocrinologia.id,
+      yearsOfExperience: 9,
+      consultationPrice: 145.0,
+      rating: 4.7,
+    },
+  });
+
   // ====================== SCHEDULES ======================
   const schedule1 = await prisma.schedule.create({
     data: {
@@ -271,7 +828,7 @@ async function main() {
     },
   });
 
-  const schedule2 = await prisma.schedule.create({
+  await prisma.schedule.create({
     data: {
       dayOfWeek: 3, // Miércoles
       startTime: '14:00',
@@ -281,13 +838,182 @@ async function main() {
     },
   });
 
-  const schedule3 = await prisma.schedule.create({
+  await prisma.schedule.create({
     data: {
       dayOfWeek: 5, // Viernes
       startTime: '09:00',
       endTime: '13:00',
       slotMinutes: 30,
       doctorId: doctor1.id,
+    },
+  });
+
+  // Schedules para Doctor 3 (Ginecóloga)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 2, // Martes
+      startTime: '10:00',
+      endTime: '14:00',
+      slotMinutes: 45,
+      doctorId: doctor3.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 4, // Jueves
+      startTime: '15:00',
+      endTime: '19:00',
+      slotMinutes: 45,
+      doctorId: doctor3.id,
+    },
+  });
+
+  // Schedules para Doctor 4 (Traumatólogo)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 1, // Lunes
+      startTime: '14:00',
+      endTime: '18:00',
+      slotMinutes: 30,
+      doctorId: doctor4.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 3, // Miércoles
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: 30,
+      doctorId: doctor4.id,
+    },
+  });
+
+  // Schedules para Doctor 5 (Dermatóloga)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 2, // Martes
+      startTime: '08:00',
+      endTime: '12:00',
+      slotMinutes: 30,
+      doctorId: doctor5.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 5, // Viernes
+      startTime: '14:00',
+      endTime: '18:00',
+      slotMinutes: 30,
+      doctorId: doctor5.id,
+    },
+  });
+
+  // Schedules para Doctor 6 (Oftalmólogo)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 1, // Lunes
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: 20,
+      doctorId: doctor6.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 4, // Jueves
+      startTime: '10:00',
+      endTime: '14:00',
+      slotMinutes: 20,
+      doctorId: doctor6.id,
+    },
+  });
+
+  // Schedules para Doctor 7 (Neurólogo)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 2, // Martes
+      startTime: '15:00',
+      endTime: '19:00',
+      slotMinutes: 60,
+      doctorId: doctor7.id,
+    },
+  });
+
+  // Schedules para Doctor 8 (Psiquiatra)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 3, // Miércoles
+      startTime: '10:00',
+      endTime: '14:00',
+      slotMinutes: 60,
+      doctorId: doctor8.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 5, // Viernes
+      startTime: '10:00',
+      endTime: '14:00',
+      slotMinutes: 60,
+      doctorId: doctor8.id,
+    },
+  });
+
+  // Schedules para Doctor 9 (Otorrinolaringólogo)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 1, // Lunes
+      startTime: '16:00',
+      endTime: '20:00',
+      slotMinutes: 30,
+      doctorId: doctor9.id,
+    },
+  });
+
+  // Schedules para Doctor 10 (Urólogo)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 2, // Martes
+      startTime: '08:00',
+      endTime: '12:00',
+      slotMinutes: 40,
+      doctorId: doctor10.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 4, // Jueves
+      startTime: '14:00',
+      endTime: '18:00',
+      slotMinutes: 40,
+      doctorId: doctor10.id,
+    },
+  });
+
+  // Schedules para Doctor 11 (Endocrinóloga)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 3, // Miércoles
+      startTime: '08:00',
+      endTime: '12:00',
+      slotMinutes: 45,
+      doctorId: doctor11.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 5, // Viernes
+      startTime: '15:00',
+      endTime: '19:00',
+      slotMinutes: 45,
+      doctorId: doctor11.id,
     },
   });
 
@@ -414,6 +1140,281 @@ async function main() {
     });
   }
 
+  // Obtener más slots para crear más citas
+  const allSlots = await prisma.slot.findMany({
+    where: { status: 'FREE' },
+    take: 50,
+    orderBy: { startAt: 'asc' },
+  });
+
+  // Appointment 2: Patient2 - Doctor2 (CONFIRMED)
+  if (allSlots[0]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient2.id,
+        doctorId: doctor2.id,
+        slotId: allSlots[0].id,
+        status: 'CONFIRMED',
+        reason: 'Control pediátrico',
+        notes: 'Vacunación pendiente',
+        confirmedAt: new Date(),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[0].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 3: Patient3 - Doctor3 (ATTENDED)
+  if (allSlots[1]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient3.id,
+        doctorId: doctor3.id,
+        slotId: allSlots[1].id,
+        status: 'ATTENDED',
+        reason: 'Consulta ginecológica',
+        notes: 'Examen de rutina realizado',
+        confirmedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        attendedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[1].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 4: Patient4 - Doctor4 (CANCELLED)
+  if (allSlots[2]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient4.id,
+        doctorId: doctor4.id,
+        slotId: allSlots[2].id,
+        status: 'CANCELLED',
+        reason: 'Dolor en rodilla',
+        notes: 'Paciente canceló por motivos personales',
+        cancelledAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[2].id },
+      data: { status: 'FREE' },
+    });
+  }
+
+  // Appointment 5: Patient5 - Doctor5 (PENDING)
+  if (allSlots[3]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient5.id,
+        doctorId: doctor5.id,
+        slotId: allSlots[3].id,
+        status: 'PENDING',
+        reason: 'Problema dermatológico',
+        notes: 'Consulta por acné severo',
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[3].id },
+      data: { status: 'HELD' },
+    });
+  }
+
+  // Appointment 6: Patient6 - Doctor6 (CONFIRMED)
+  if (allSlots[4]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient6.id,
+        doctorId: doctor6.id,
+        slotId: allSlots[4].id,
+        status: 'CONFIRMED',
+        reason: 'Revisión de vista',
+        notes: 'Paciente reporta visión borrosa',
+        confirmedAt: new Date(),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[4].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 7: Patient7 - Doctor7 (NO_SHOW)
+  if (allSlots[5]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient7.id,
+        doctorId: doctor7.id,
+        slotId: allSlots[5].id,
+        status: 'NO_SHOW',
+        reason: 'Consulta neurológica',
+        notes: 'Paciente no se presentó a la cita',
+        confirmedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[5].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 8: Patient8 - Doctor8 (CONFIRMED)
+  if (allSlots[6]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient8.id,
+        doctorId: doctor8.id,
+        slotId: allSlots[6].id,
+        status: 'CONFIRMED',
+        reason: 'Consulta psiquiátrica',
+        notes: 'Primera consulta por ansiedad',
+        confirmedAt: new Date(),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[6].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 9: Patient2 - Doctor9 (ATTENDED)
+  if (allSlots[7]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient2.id,
+        doctorId: doctor9.id,
+        slotId: allSlots[7].id,
+        status: 'ATTENDED',
+        reason: 'Dolor de oído',
+        notes: 'Infección tratada con antibióticos',
+        confirmedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        attendedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[7].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 10: Patient3 - Doctor10 (CONFIRMED)
+  if (allSlots[8]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient3.id,
+        doctorId: doctor10.id,
+        slotId: allSlots[8].id,
+        status: 'CONFIRMED',
+        reason: 'Consulta urológica',
+        notes: 'Evaluación preventiva',
+        confirmedAt: new Date(),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[8].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 11: Patient4 - Doctor11 (PENDING)
+  if (allSlots[9]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient4.id,
+        doctorId: doctor11.id,
+        slotId: allSlots[9].id,
+        status: 'PENDING',
+        reason: 'Control de diabetes',
+        notes: 'Ajuste de tratamiento',
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[9].id },
+      data: { status: 'HELD' },
+    });
+  }
+
+  // Appointment 12: Patient5 - Doctor1 (ATTENDED)
+  if (allSlots[10]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient5.id,
+        doctorId: doctor1.id,
+        slotId: allSlots[10].id,
+        status: 'ATTENDED',
+        reason: 'Chequeo cardíaco',
+        notes: 'Electrocardiograma normal',
+        confirmedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+        attendedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[10].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 13: Patient6 - Doctor2 (CANCELLED)
+  if (allSlots[11]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient6.id,
+        doctorId: doctor2.id,
+        slotId: allSlots[11].id,
+        status: 'CANCELLED',
+        reason: 'Vacunación infantil',
+        notes: 'Cancelado por el doctor',
+        cancelledAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[11].id },
+      data: { status: 'FREE' },
+    });
+  }
+
+  // Appointment 14: Patient7 - Doctor3 (CONFIRMED)
+  if (allSlots[12]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient7.id,
+        doctorId: doctor3.id,
+        slotId: allSlots[12].id,
+        status: 'CONFIRMED',
+        reason: 'Ecografía',
+        notes: 'Estudio programado',
+        confirmedAt: new Date(),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[12].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
+  // Appointment 15: Patient8 - Doctor4 (ATTENDED)
+  if (allSlots[13]) {
+    await prisma.appointment.create({
+      data: {
+        userId: patient8.id,
+        doctorId: doctor4.id,
+        slotId: allSlots[13].id,
+        status: 'ATTENDED',
+        reason: 'Esguince de tobillo',
+        notes: 'Tratamiento fisioterapéutico indicado',
+        confirmedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+        attendedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.slot.update({
+      where: { id: allSlots[13].id },
+      data: { status: 'BOOKED' },
+    });
+  }
+
   // ====================== DOCTOR UNAVAILABILITY ======================
   await prisma.doctorUnavailability.create({
     data: {
@@ -423,9 +1424,185 @@ async function main() {
       reason: 'Congreso médico',
     },
   });
+
+  await prisma.doctorUnavailability.create({
+    data: {
+      doctorId: doctor1.id,
+      startAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      reason: 'Vacaciones programadas',
+    },
+  });
+
+  await prisma.doctorUnavailability.create({
+    data: {
+      doctorId: doctor4.id,
+      startAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+      reason: 'Conferencia internacional',
+    },
+  });
+
+  await prisma.doctorUnavailability.create({
+    data: {
+      doctorId: doctor7.id,
+      startAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000),
+      reason: 'Capacitación especializada',
+    },
+  });
+
+  // ====================== EMAIL MESSAGES ======================
+  await prisma.emailMessage.createMany({
+    data: [
+      {
+        to: patient?.email || 'patient@example.com',
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: patient
+            ? `${patient.firstName} ${patient.lastName}`
+            : 'Juan Pérez',
+          doctorName: 'Dr. Carlos Ramírez',
+          date: new Date().toISOString(),
+          specialty: 'Cardiología',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(),
+      },
+      {
+        to: patient2.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient2.firstName} ${patient2.lastName}`,
+          doctorName: 'Dra. María Gómez',
+          date: new Date().toISOString(),
+          specialty: 'Pediatría',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(),
+      },
+      {
+        to: patient4.email,
+        subject: 'Cancelación de cita médica',
+        template: 'BOOKING_CANCELLATION',
+        variables: {
+          patientName: `${patient4.firstName} ${patient4.lastName}`,
+          doctorName: 'Dr. Miguel González',
+          date: new Date().toISOString(),
+          reason: 'Motivos personales',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+      {
+        to: patient5.email,
+        subject: 'Recordatorio de cita médica',
+        template: 'BOOKING_REMINDER',
+        variables: {
+          patientName: `${patient5.firstName} ${patient5.lastName}`,
+          doctorName: 'Dra. Patricia Sánchez',
+          date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Dermatología',
+        },
+        status: 'PENDING',
+        attempts: 0,
+      },
+      {
+        to: patient6.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient6.firstName} ${patient6.lastName}`,
+          doctorName: 'Dr. Jorge Herrera',
+          date: new Date().toISOString(),
+          specialty: 'Oftalmología',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(),
+      },
+      {
+        to: patient7.email,
+        subject: 'Ausencia en cita médica',
+        template: 'BOOKING_REMINDER',
+        variables: {
+          patientName: `${patient7.firstName} ${patient7.lastName}`,
+          doctorName: 'Dr. Ricardo Mendoza',
+          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Neurología',
+        },
+        status: 'FAILED',
+        attempts: 3,
+        lastError: 'Email address not reachable',
+      },
+      {
+        to: patient8.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient8.firstName} ${patient8.lastName}`,
+          doctorName: 'Dra. Elena Ortiz',
+          date: new Date().toISOString(),
+          specialty: 'Psiquiatría',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(),
+      },
+      {
+        to: patient3.email,
+        subject: 'Recordatorio de cita médica',
+        template: 'BOOKING_REMINDER',
+        variables: {
+          patientName: `${patient3.firstName} ${patient3.lastName}`,
+          doctorName: 'Dr. Fernando Castro',
+          date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Urología',
+        },
+        status: 'RETRYING',
+        attempts: 2,
+        lastError: 'Temporary server error',
+      },
+      {
+        to: 'admin@example.com',
+        subject: 'Bienvenido a Clínica Perú',
+        template: 'WELCOME',
+        variables: {
+          userName: 'Admin',
+          loginUrl: 'https://clinicaperu.com/login',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      },
+      {
+        to: patient?.email || 'patient@example.com',
+        subject: 'Recuperación de contraseña',
+        template: 'PASSWORD_RESET',
+        variables: {
+          userName: patient?.firstName || 'Juan',
+          resetLink: 'https://clinicaperu.com/reset-password?token=abc123',
+          expiresIn: '24 horas',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log('✅ Múltiples citas creadas con diferentes estados');
+  console.log('✅ Indisponibilidades de doctores registradas');
+  console.log('✅ Mensajes de email generados');
 }
 
-main()
+void main()
   .then(() => {
     console.log(
       '✅ Seed ejecutado con éxito: Clínica San Pablo Perú inicializada',
@@ -435,6 +1612,4 @@ main()
     console.error('❌ Error ejecutando seed:', e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());
