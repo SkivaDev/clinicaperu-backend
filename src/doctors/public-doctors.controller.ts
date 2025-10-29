@@ -44,6 +44,11 @@ export class PublicDoctorsController {
     description: 'Filtrar por ID de especialidad',
   })
   @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    description: 'Filtrar por ID de clínica',
+  })
+  @ApiQuery({
     name: 'page',
     required: false,
     type: Number,
@@ -63,6 +68,7 @@ export class PublicDoctorsController {
   async findAll(
     @Query('search') search?: string,
     @Query('specialtyId') specialtyId?: string,
+    @Query('clinicId') clinicId?: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
   ): Promise<
@@ -77,6 +83,7 @@ export class PublicDoctorsController {
     const result = await this.doctorsService.findPublicDoctors({
       search,
       specialtyId,
+      clinicId,
       page: pageNum,
       limit: limitNum,
     });

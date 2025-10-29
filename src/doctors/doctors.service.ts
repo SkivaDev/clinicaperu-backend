@@ -236,13 +236,14 @@ export class DoctorsService {
   async findPublicDoctors(params: {
     search?: string;
     specialtyId?: string;
+    clinicId?: string;
     page: number;
     limit: number;
   }): Promise<{
     data: PublicDoctorListDto[];
     meta: { total: number; page: number; limit: number; totalPages: number };
   }> {
-    const { search, specialtyId, page, limit } = params;
+    const { search, specialtyId, clinicId, page, limit } = params;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -276,6 +277,10 @@ export class DoctorsService {
       where.specialtyId = specialtyId;
     }
 
+    if (clinicId) {
+      where.clinicId = clinicId;
+    }
+
     const [doctors, total] = await Promise.all([
       this.prisma.doctor.findMany({
         where,
@@ -302,9 +307,21 @@ export class DoctorsService {
 
     const data: PublicDoctorListDto[] = doctors.map((doctor) => ({
       id: doctor.id,
-      name: doctor.user.firstName,
-      lastName: doctor.user.lastName,
       cmp: doctor.cmp,
+      yearsOfExperience: doctor.yearsOfExperience || null,
+      consultationPrice: doctor.consultationPrice || null,
+      attendedPatients: doctor.attendedPatients,
+      rating: doctor.rating > 0 ? doctor.rating : undefined,
+      // attendedAppointments: doctor.attendedAppointments,
+      // totalAppointments: doctor.appointments.length,
+      user: {
+        id: doctor.user.id,
+        firstName: doctor.user.firstName,
+        lastName: doctor.user.lastName,
+        profileImage: doctor.user.profileImage,
+        email: doctor.user.email,
+        phone: doctor.user.phone || null,
+      },
       specialty: {
         id: doctor.specialty.id,
         name: doctor.specialty.name,
@@ -313,8 +330,7 @@ export class DoctorsService {
         id: doctor.clinic.id,
         name: doctor.clinic.name,
       },
-      rating: doctor.rating > 0 ? doctor.rating : undefined,
-      totalAppointments: doctor.appointments.length,
+      // totalAppointments: doctor.appointments.length,
     }));
 
     return {
@@ -363,12 +379,20 @@ export class DoctorsService {
 
     return {
       id: doctor.id,
-      name: doctor.user.firstName,
-      lastName: doctor.user.lastName,
-      email: doctor.user.email,
-      phone: doctor.user.phone || undefined,
       cmp: doctor.cmp,
-      image: doctor.user.profileImage || undefined,
+      yearsOfExperience: doctor.yearsOfExperience || null,
+      consultationPrice: doctor.consultationPrice || null,
+      attendedPatients: doctor.attendedPatients,
+      rating,
+      user: {
+        id: doctor.user.id,
+        firstName: doctor.user.firstName,
+        lastName: doctor.user.lastName,
+        profileImage: doctor.user.profileImage,
+        email: doctor.user.email,
+        phone: doctor.user.phone || null,
+      },
+
       specialty: {
         id: doctor.specialty.id,
         name: doctor.specialty.name,
@@ -377,8 +401,7 @@ export class DoctorsService {
         id: doctor.clinic.id,
         name: doctor.clinic.name,
       },
-      rating,
-      totalAppointments: doctor.appointments.length,
+      // totalAppointments: doctor.appointments.length,
       schedules: doctor.schedules.map((schedule) => ({
         dayOfWeek: schedule.dayOfWeek,
         startTime: schedule.startTime,
