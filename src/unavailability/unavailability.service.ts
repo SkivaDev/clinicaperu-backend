@@ -8,6 +8,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUnavailabilityDto } from './dto/create-unavailability.dto';
 import { UpdateUnavailabilityDto } from './dto/update-unavailability.dto';
 import { UnavailabilityResponseDto } from './dto/unavailability-response.dto';
+import { DoctorResponseDto } from 'src/doctors/dto/doctor-response.dto';
+import { CurrentUserPayload } from 'src/auth/types/current-user.interface';
 
 @Injectable()
 export class UnavailabilityService {
@@ -18,11 +20,11 @@ export class UnavailabilityService {
    * Validates that no confirmed appointments exist in the period
    */
   async create(
-    doctorId: string,
+    userId: string,
     dto: CreateUnavailabilityDto,
   ): Promise<UnavailabilityResponseDto> {
     // Validate doctor exists
-    await this.validateDoctorExists(doctorId);
+    const doctorId = await this.validateDoctorExists(userId);
 
     // Validate date range
     this.validateDateRange(dto.startAt, dto.endAt);
@@ -51,9 +53,9 @@ export class UnavailabilityService {
    * Gets all future unavailability periods for a doctor
    */
   async findAllFuture(
-    doctorId: string,
+    doctorUser: CurrentUserPayload,
   ): Promise<UnavailabilityResponseDto[]> {
-    await this.validateDoctorExists(doctorId);
+    const doctorId = await this.validateDoctorExists(doctorUser.userId);
 
     const now = new Date();
     const unavailabilities = await this.prisma.doctorUnavailability.findMany({
@@ -74,8 +76,10 @@ export class UnavailabilityService {
   /**
    * Gets all unavailability periods for a doctor (including past)
    */
-  async findAll(doctorId: string): Promise<UnavailabilityResponseDto[]> {
-    await this.validateDoctorExists(doctorId);
+  async findAll(
+    doctorUser: CurrentUserPayload,
+  ): Promise<UnavailabilityResponseDto[]> {
+    const doctorId = await this.validateDoctorExists(doctorUser.userId);
 
     const unavailabilities = await this.prisma.doctorUnavailability.findMany({
       where: { doctorId },
@@ -91,9 +95,11 @@ export class UnavailabilityService {
    * Gets a specific unavailability period by ID
    */
   async findOne(
-    doctorId: string,
+    doctorUser: CurrentUserPayload,
     id: string,
   ): Promise<UnavailabilityResponseDto> {
+    const doctorId = await this.validateDoctorExists(doctorUser.userId);
+
     const unavailability = await this.prisma.doctorUnavailability.findUnique({
       where: { id },
     });
@@ -118,12 +124,13 @@ export class UnavailabilityService {
    * Cannot update if there are confirmed appointments in the new period
    */
   async update(
-    doctorId: string,
+    doctorUser: CurrentUserPayload,
     id: string,
     dto: UpdateUnavailabilityDto,
   ): Promise<UnavailabilityResponseDto> {
+    const doctorId = await this.validateDoctorExists(doctorUser.userId);
     // Verify unavailability exists and belongs to doctor
-    const existing = await this.findOne(doctorId, id);
+    const existing = await this.findOne(doctorUser, id);
 
     // Validate new date range if provided
     const newStartAt = dto.startAt || existing.startAt;
@@ -151,9 +158,10 @@ export class UnavailabilityService {
    * Deletes an unavailability period
    * Cannot delete if there are confirmed appointments in the period
    */
-  async remove(doctorId: string, id: string): Promise<void> {
+  async remove(doctorUser: CurrentUserPayload, id: string): Promise<void> {
+    const doctorId = await this.validateDoctorExists(doctorUser.userId);
     // Verify unavailability exists and belongs to doctor
-    const unavailability = await this.findOne(doctorId, id);
+    const unavailability = await this.findOne(doctorUser, id);
 
     // Check for confirmed appointments
     await this.validateNoConfirmedAppointments(
@@ -172,10 +180,7 @@ export class UnavailabilityService {
    * Checks if a specific date/time overlaps with any unavailability period
    * Used by slot generation
    */
-  async isDateUnavailable(
-    doctorId: string,
-    date: Date,
-  ): Promise<boolean> {
+  async isDateUnavailable(doctorId: string, date: Date): Promise<boolean> {
     const count = await this.prisma.doctorUnavailability.count({
       where: {
         doctorId,
@@ -248,15 +253,18 @@ export class UnavailabilityService {
   /**
    * Validates that a doctor exists
    */
-  private async validateDoctorExists(doctorId: string): Promise<void> {
+  private async validateDoctorExists(userId: string): Promise<string> {
     const doctor = await this.prisma.doctor.findUnique({
-      where: { id: doctorId },
+      where: { userId: userId },
       select: { id: true },
     });
 
     if (!doctor) {
-      throw new NotFoundException(`Doctor with ID ${doctorId} not found`);
+      throw new NotFoundException(
+        `Doctor with user ID ${userId} not found or does not exist`,
+      );
     }
+    return doctor.id;
   }
 
   /**
@@ -272,9 +280,7 @@ export class UnavailabilityService {
     // Optional: Validate that dates are in the future
     const now = new Date();
     if (startAt < now) {
-      throw new BadRequestException(
-        'La fecha de inicio debe ser en el futuro',
-      );
+      throw new BadRequestException('La fecha de inicio debe ser en el futuro');
     }
   }
 
@@ -311,9 +317,7 @@ export class UnavailabilityService {
   /**
    * Maps database model to response DTO
    */
-  private mapToResponse(
-    unavailability: any,
-  ): UnavailabilityResponseDto {
+  private mapToResponse(unavailability: any): UnavailabilityResponseDto {
     return {
       id: unavailability.id,
       startAt: unavailability.startAt,

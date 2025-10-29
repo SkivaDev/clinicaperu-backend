@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 // import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { User } from '@prisma/client';
+import { User, Role } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
 import { HashingService } from 'src/common/hashing/hashing.service';
+import { UserSearchResultDto } from './dto/user-search-result.dto';
 
 @Injectable()
 export class UsersService {
@@ -58,6 +59,63 @@ export class UsersService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
+  }
+
+  /**
+   * Busca usuarios por DNI, nombre, apellido o email
+   * @param query - Término de búsqueda
+   * @param role - Filtro opcional por rol (PATIENT, DOCTOR, ADMIN)
+   * @param limit - Límite de resultados (default: 20)
+   * @returns Lista de usuarios que coinciden con la búsqueda
+   */
+  async searchUsers(
+    query: string,
+    role?: Role,
+    limit: number = 20,
+  ): Promise<UserSearchResultDto[]> {
+    // Construir cláusula WHERE con búsqueda en múltiples campos
+    const whereConditions: any[] = [
+      {
+        OR: [
+          { dni: { contains: query, mode: 'insensitive' } },
+          { firstName: { contains: query, mode: 'insensitive' } },
+          { lastName: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      { isActive: true },
+    ];
+
+    // Agregar filtro por rol si se especifica
+    if (role) {
+      whereConditions.push({ role });
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        AND: whereConditions,
+      },
+      select: {
+        id: true,
+        dni: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        profileImage: true,
+        role: true,
+        isActive: true,
+      },
+      take: limit,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
+
+    // Mapear para convertir null a undefined
+    return users.map((user) => ({
+      ...user,
+      phone: user.phone ?? undefined,
+      profileImage: user.profileImage ?? undefined,
+    }));
   }
 
   // findOne(id: number) {

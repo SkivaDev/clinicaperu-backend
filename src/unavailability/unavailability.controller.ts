@@ -25,37 +25,36 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { CurrentUser } from 'src/auth/decorators/user.decorator';
+import type { CurrentUserPayload } from 'src/auth/types/current-user.interface';
 
 /**
  * Controller for managing doctor unavailability periods
- * Implements HU-020.5 requirements
+ * Implements HU-020.5 requirements / despues lo modificamos 10/29/2025 por temas de seguridad
  */
 @ApiTags('doctor-unavailability')
-@Controller('doctors/:doctorId/unavailability')
+@Controller('doctor/unavailability')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.DOCTOR) // <-- Solo doctores pueden usar este controlador
 @ApiBearerAuth()
 export class UnavailabilityController {
-  constructor(
-    private readonly unavailabilityService: UnavailabilityService,
-  ) {}
+  constructor(private readonly unavailabilityService: UnavailabilityService) {}
 
   /**
-   * POST /doctors/:doctorId/unavailability
-   * Creates a new unavailability period
-   * Only ADMIN and DOCTOR can create
+   * POST /doctor/unavailability
+   * Crea un nuevo período de no disponibilidad para el doctor autenticado
    */
   @Post()
-  @Roles(Role.ADMIN, Role.DOCTOR)
   @ApiOperation({
     summary: 'Crear período de no disponibilidad',
     description:
       'Crea un nuevo período de no disponibilidad para un doctor. No se puede crear si existen citas confirmadas en el período.',
   })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
-  })
+  // @ApiParam({
+  //   name: 'doctorId',
+  //   description: 'ID del doctor (UUID)',
+  //   type: String,
+  // })
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Período de no disponibilidad creado exitosamente',
@@ -74,11 +73,12 @@ export class UnavailabilityController {
     description: 'Existen citas confirmadas en el período especificado',
   })
   async create(
-    @Param('doctorId') doctorId: string,
+    // @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
     @Body() createDto: CreateUnavailabilityDto,
   ): Promise<ResponseDto<UnavailabilityResponseDto>> {
     const unavailability = await this.unavailabilityService.create(
-      doctorId,
+      doctorUser.userId,
       createDto,
     );
     return {
@@ -89,7 +89,7 @@ export class UnavailabilityController {
   }
 
   /**
-   * GET /doctors/:doctorId/unavailability
+   * GET /doctor/unavailability
    * Lists all future unavailability periods
    */
   @Get()
@@ -97,11 +97,6 @@ export class UnavailabilityController {
     summary: 'Listar períodos de no disponibilidad futuros',
     description:
       'Obtiene todos los períodos de no disponibilidad futuros o actuales de un doctor.',
-  })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -113,10 +108,10 @@ export class UnavailabilityController {
     description: 'Doctor no encontrado',
   })
   async findAllFuture(
-    @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
   ): Promise<ResponseDto<UnavailabilityResponseDto[]>> {
     const unavailabilities =
-      await this.unavailabilityService.findAllFuture(doctorId);
+      await this.unavailabilityService.findAllFuture(doctorUser);
     return {
       statusCode: HttpStatus.OK,
       message: 'Períodos de no disponibilidad obtenidos exitosamente',
@@ -125,20 +120,15 @@ export class UnavailabilityController {
   }
 
   /**
-   * GET /doctors/:doctorId/unavailability/all
-   * Lists all unavailability periods (including past)
+   * GET /doctors/:doctorId/unavailability/all ANTES
+   * GET /doctor/unavailability/all AHORA
+   * Lista todos los períodos (incluyendo pasados) del doctor autenticado
    */
   @Get('all')
-  @Roles(Role.ADMIN, Role.DOCTOR)
   @ApiOperation({
     summary: 'Listar todos los períodos de no disponibilidad',
     description:
       'Obtiene todos los períodos de no disponibilidad de un doctor, incluyendo pasados.',
-  })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -146,10 +136,10 @@ export class UnavailabilityController {
     type: [UnavailabilityResponseDto],
   })
   async findAll(
-    @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
   ): Promise<ResponseDto<UnavailabilityResponseDto[]>> {
     const unavailabilities =
-      await this.unavailabilityService.findAll(doctorId);
+      await this.unavailabilityService.findAll(doctorUser);
     return {
       statusCode: HttpStatus.OK,
       message: 'Todos los períodos obtenidos exitosamente',
@@ -158,19 +148,21 @@ export class UnavailabilityController {
   }
 
   /**
-   * GET /doctors/:doctorId/unavailability/:id
+   * GET /doctors/:doctorId/unavailability/:id ANTES
+   * GET /doctor/unavailability/:id AHORA
    * Gets a specific unavailability period
    */
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener un período de no disponibilidad específico',
-    description: 'Obtiene los detalles de un período de no disponibilidad por su ID.',
+    description:
+      'Obtiene los detalles de un período de no disponibilidad por su ID.',
   })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
-  })
+  // @ApiParam({
+  //   name: 'doctorId',
+  //   description: 'ID del doctor (UUID)',
+  //   type: String,
+  // })
   @ApiParam({
     name: 'id',
     description: 'ID del período de no disponibilidad (UUID)',
@@ -186,11 +178,11 @@ export class UnavailabilityController {
     description: 'Período no encontrado',
   })
   async findOne(
-    @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
     @Param('id') id: string,
   ): Promise<ResponseDto<UnavailabilityResponseDto>> {
     const unavailability = await this.unavailabilityService.findOne(
-      doctorId,
+      doctorUser,
       id,
     );
     return {
@@ -201,21 +193,16 @@ export class UnavailabilityController {
   }
 
   /**
-   * PUT /doctors/:doctorId/unavailability/:id
+   * PUT /doctors/:doctorId/unavailability/:id ANTES
+   * PUT /doctor/unavailability/:id AHORA
    * Updates an unavailability period
    * Only ADMIN and DOCTOR can update
    */
   @Put(':id')
-  @Roles(Role.ADMIN, Role.DOCTOR)
   @ApiOperation({
     summary: 'Actualizar período de no disponibilidad',
     description:
       'Actualiza un período de no disponibilidad. No se puede actualizar si existen citas confirmadas en el nuevo período.',
-  })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
   })
   @ApiParam({
     name: 'id',
@@ -236,12 +223,12 @@ export class UnavailabilityController {
     description: 'Existen citas confirmadas en el nuevo período',
   })
   async update(
-    @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
     @Param('id') id: string,
     @Body() updateDto: UpdateUnavailabilityDto,
   ): Promise<ResponseDto<UnavailabilityResponseDto>> {
     const unavailability = await this.unavailabilityService.update(
-      doctorId,
+      doctorUser,
       id,
       updateDto,
     );
@@ -253,21 +240,16 @@ export class UnavailabilityController {
   }
 
   /**
-   * DELETE /doctors/:doctorId/unavailability/:id
+   * DELETE /doctors/:doctorId/unavailability/:id ANTES
+   * DELETE /doctor/unavailability/:id AHORA
    * Deletes an unavailability period
    * Only ADMIN and DOCTOR can delete
    */
   @Delete(':id')
-  @Roles(Role.ADMIN, Role.DOCTOR)
   @ApiOperation({
     summary: 'Eliminar período de no disponibilidad',
     description:
       'Elimina un período de no disponibilidad. No se puede eliminar si existen citas confirmadas en el período.',
-  })
-  @ApiParam({
-    name: 'doctorId',
-    description: 'ID del doctor (UUID)',
-    type: String,
   })
   @ApiParam({
     name: 'id',
@@ -287,10 +269,10 @@ export class UnavailabilityController {
     description: 'Existen citas confirmadas en el período',
   })
   async remove(
-    @Param('doctorId') doctorId: string,
+    @CurrentUser() doctorUser: CurrentUserPayload,
     @Param('id') id: string,
   ): Promise<ResponseDto<void>> {
-    await this.unavailabilityService.remove(doctorId, id);
+    await this.unavailabilityService.remove(doctorUser, id);
     return {
       statusCode: HttpStatus.OK,
       message: 'Período de no disponibilidad eliminado exitosamente',
