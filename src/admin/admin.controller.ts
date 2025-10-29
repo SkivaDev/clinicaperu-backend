@@ -66,12 +66,10 @@ export class AdminController {
       };
     }
 
-    const { passwordHash, ...userWithoutPassword } = user;
-
     return {
       statusCode: HttpStatus.OK,
       message: 'User found successfully',
-      data: userWithoutPassword,
+      data: user,
     };
   }
 

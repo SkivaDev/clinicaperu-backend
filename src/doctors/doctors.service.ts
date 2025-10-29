@@ -71,6 +71,7 @@ export class DoctorsService {
         });
 
         //retornar sin el passwordHash
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { passwordHash: _, ...userWithoutPassword } = user;
         return { ...doctor, user: userWithoutPassword };
       });
@@ -88,7 +89,11 @@ export class DoctorsService {
       include: { user: true, clinic: true, specialty: true, schedules: true },
     });
     if (!doctor) throw new NotFoundException('Doctor not found');
-    return doctor;
+
+    // Excluir passwordHash del usuario
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash, ...userWithoutPassword } = doctor.user;
+    return { ...doctor, user: userWithoutPassword };
   }
 
   async getDoctorIds(id: string) {
@@ -165,6 +170,7 @@ export class DoctorsService {
         },
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { passwordHash: _, ...userWithoutPassword } = updatedUser;
       return { ...updatedDoctor, user: userWithoutPassword };
     });
@@ -174,29 +180,55 @@ export class DoctorsService {
 
   async deleteDoctor(id: string) {
     await this.getDoctorIds(id);
-    return this.prisma.doctor.delete({
+    const doctor = await this.prisma.doctor.delete({
       where: { id },
       include: { user: true },
     });
+
+    // Excluir passwordHash del usuario
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash, ...userWithoutPassword } = doctor.user;
+    return { ...doctor, user: userWithoutPassword };
   }
 
   async listDoctors() {
-    return this.prisma.doctor.findMany({
+    const doctors = await this.prisma.doctor.findMany({
       include: { user: true, clinic: true, specialty: true },
+    });
+
+    // Excluir passwordHash de cada usuario
+    return doctors.map((doctor) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash, ...userWithoutPassword } = doctor.user;
+      return { ...doctor, user: userWithoutPassword };
     });
   }
 
   async listDoctorsByClinic(clinicId: string) {
-    return this.prisma.doctor.findMany({
+    const doctors = await this.prisma.doctor.findMany({
       where: { clinicId },
       include: { user: true, specialty: true },
+    });
+
+    // Excluir passwordHash de cada usuario
+    return doctors.map((doctor) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash, ...userWithoutPassword } = doctor.user;
+      return { ...doctor, user: userWithoutPassword };
     });
   }
 
   async listDoctorsBySpecialty(specialtyId: string) {
-    return this.prisma.doctor.findMany({
+    const doctors = await this.prisma.doctor.findMany({
       where: { specialtyId },
       include: { user: true, clinic: true },
+    });
+
+    // Excluir passwordHash de cada usuario
+    return doctors.map((doctor) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash, ...userWithoutPassword } = doctor.user;
+      return { ...doctor, user: userWithoutPassword };
     });
   }
 

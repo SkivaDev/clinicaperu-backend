@@ -18,12 +18,17 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const { password, ...userData } = dto;
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: {
         ...userData,
         passwordHash: await this.hashingService.hash(password),
       },
     });
+
+    // Excluir passwordHash
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   findByEmail(email: string): Promise<User | null> {
@@ -34,12 +39,25 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { dni } });
   }
 
-  findAll() {
-    return this.prisma.user.findMany();
+  async findAll() {
+    const users = await this.prisma.user.findMany();
+
+    // Excluir passwordHash de cada usuario
+    return users.map((user) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    });
   }
 
-  findById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { id } });
+  async findById(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) return null;
+
+    // Excluir passwordHash
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   // findOne(id: number) {

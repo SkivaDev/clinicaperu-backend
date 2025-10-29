@@ -20,7 +20,7 @@ export class DoctorResponseDto {
   // unavail?: DoctorUnavailabilityResponseDto[];
   // appointments?: AppointmentResponseDto[];
 
-  user?: UserResponseDto;
+  user: UserResponseDto;
   specialty?: SpecialtyResponseDto;
   clinic?: ClinicResponseDto;
 }

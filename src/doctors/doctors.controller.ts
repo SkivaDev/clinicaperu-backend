@@ -39,7 +39,9 @@ import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 @ApiBearerAuth('bearerAuth')
 @ApiCookieAuth('cookieAuth')
 @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
-@ApiForbiddenResponse({ description: 'Acceso denegado - Se requiere rol de ADMIN' })
+@ApiForbiddenResponse({
+  description: 'Acceso denegado - Se requiere rol de ADMIN',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 @Controller('admin/doctors')
@@ -47,26 +49,26 @@ export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
 
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Crear nuevo doctor',
-    description: 'Crea un nuevo doctor en el sistema (solo administradores)'
+    description: 'Crea un nuevo doctor en el sistema (solo administradores)',
   })
-  @ApiBody({ 
+  @ApiBody({
     description: 'Datos del doctor a crear',
     schema: {
       allOf: [
         { $ref: '#/components/schemas/CreateUserDto' },
-        { $ref: '#/components/schemas/CreateDoctorDto' }
-      ]
-    }
+        { $ref: '#/components/schemas/CreateDoctorDto' },
+      ],
+    },
   })
   @ApiCreatedResponse({
     description: 'Doctor creado exitosamente',
-    type: ResponseDto<DoctorResponseDto>
+    type: ResponseDto<DoctorResponseDto>,
   })
   @ApiResponse({
     status: 400,
-    description: 'Datos de entrada inválidos'
+    description: 'Datos de entrada inválidos',
   })
   async create(
     @Body() dto: CreateUserDto & CreateDoctorDto,
@@ -80,13 +82,13 @@ export class DoctorsController {
   }
 
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Listar todos los doctores',
-    description: 'Obtiene la lista completa de doctores del sistema'
+    description: 'Obtiene la lista completa de doctores del sistema',
   })
   @ApiOkResponse({
     description: 'Lista de doctores obtenida exitosamente',
-    type: ResponseDto<DoctorResponseDto[]>
+    type: ResponseDto<DoctorResponseDto[]>,
   })
   async findAll(): Promise<ResponseDto<DoctorResponseDto[]>> {
     const doctors = await this.doctorsService.listDoctors();
@@ -98,22 +100,22 @@ export class DoctorsController {
   }
 
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Obtener doctor por ID',
-    description: 'Obtiene los detalles de un doctor específico por su ID'
+    description: 'Obtiene los detalles de un doctor específico por su ID',
   })
   @ApiParam({
     name: 'id',
     description: 'ID único del doctor',
-    example: 'uuid-here'
+    example: 'uuid-here',
   })
   @ApiOkResponse({
     description: 'Doctor encontrado exitosamente',
-    type: ResponseDto<DoctorResponseDto>
+    type: ResponseDto<DoctorResponseDto>,
   })
   @ApiResponse({
     status: 404,
-    description: 'Doctor no encontrado'
+    description: 'Doctor no encontrado',
   })
   async findOne(
     @Param('id') id: string,
@@ -137,35 +139,35 @@ export class DoctorsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Actualizar doctor',
-    description: 'Actualiza la información de un doctor existente'
+    description: 'Actualiza la información de un doctor existente',
   })
   @ApiParam({
     name: 'id',
     description: 'ID único del doctor',
-    example: 'uuid-here'
+    example: 'uuid-here',
   })
-  @ApiBody({ 
+  @ApiBody({
     description: 'Datos del doctor a actualizar',
     schema: {
       allOf: [
         { $ref: '#/components/schemas/UpdateUserDto' },
-        { $ref: '#/components/schemas/UpdateDoctorDto' }
-      ]
-    }
+        { $ref: '#/components/schemas/UpdateDoctorDto' },
+      ],
+    },
   })
   @ApiOkResponse({
     description: 'Doctor actualizado exitosamente',
-    type: ResponseDto<DoctorResponseDto>
+    type: ResponseDto<DoctorResponseDto>,
   })
   @ApiResponse({
     status: 404,
-    description: 'Doctor no encontrado'
+    description: 'Doctor no encontrado',
   })
   @ApiResponse({
     status: 400,
-    description: 'Datos de entrada inválidos'
+    description: 'Datos de entrada inválidos',
   })
   async update(
     @Param('id') id: string,
@@ -180,22 +182,22 @@ export class DoctorsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Eliminar doctor',
-    description: 'Elimina un doctor del sistema (soft delete)'
+    description: 'Elimina un doctor del sistema (soft delete)',
   })
   @ApiParam({
     name: 'id',
     description: 'ID único del doctor',
-    example: 'uuid-here'
+    example: 'uuid-here',
   })
   @ApiOkResponse({
     description: 'Doctor eliminado exitosamente',
-    type: ResponseDto<DoctorResponseDto>
+    type: ResponseDto<DoctorResponseDto>,
   })
   @ApiResponse({
     status: 404,
-    description: 'Doctor no encontrado'
+    description: 'Doctor no encontrado',
   })
   async remove(
     @Param('id') id: string,
