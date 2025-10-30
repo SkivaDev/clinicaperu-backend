@@ -13,6 +13,7 @@ import { SlotsModule } from './slots/slots.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { EmailModule } from './email/email.module';
 import { UnavailabilityModule } from './unavailability/unavailability.module';
+import { PatientsModule } from './patients/patients.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UnavailabilityModule } from './unavailability/unavailability.module';
     SpecialtiesModule,
     ClinicsModule,
     DoctorsModule,
+    PatientsModule,
     AppointmentsModule,
     SchedulesModule,
     RoomsModule,

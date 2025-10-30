@@ -12,6 +12,7 @@
         "schedules",
         "appointments",
         "calendar",
-        "unavailability"
+        "unavailability",
+        "patients"
     ]
 }
