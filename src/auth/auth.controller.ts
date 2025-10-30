@@ -19,6 +19,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from 'src/auth/dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -38,6 +39,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 registros por minuto
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Registrar nuevo usuario',
@@ -70,6 +72,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 10 } }) // 10 intentos de login por minuto
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

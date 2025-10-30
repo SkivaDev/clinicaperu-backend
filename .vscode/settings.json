@@ -13,6 +13,7 @@
         "appointments",
         "calendar",
         "unavailability",
-        "patients"
+        "patients",
+        "security"
     ]
 }

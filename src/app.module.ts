@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -17,6 +19,24 @@ import { PatientsModule } from './patients/patients.module';
 
 @Module({
   imports: [
+    // Rate Limiting Global - Protección contra abuso
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000, // 1 segundo
+        limit: 10, // 10 requests por segundo (generoso para proyecto personal)
+      },
+      {
+        name: 'medium',
+        ttl: 60000, // 1 minuto
+        limit: 100, // 100 requests por minuto
+      },
+      {
+        name: 'long',
+        ttl: 900000, // 15 minutos
+        limit: 500, // 500 requests por 15 minutos
+      },
+    ]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -32,6 +52,13 @@ import { PatientsModule } from './patients/patients.module';
     CalendarModule,
     EmailModule,
     UnavailabilityModule,
+  ],
+  providers: [
+    // Aplicar ThrottlerGuard globalmente a todos los endpoints
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

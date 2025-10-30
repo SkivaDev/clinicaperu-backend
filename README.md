@@ -23,7 +23,34 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Backend API para ClinicaPeru - Sistema de gestión de citas médicas construido con NestJS, PostgreSQL y Prisma.
+
+## 🔒 Seguridad
+
+Este proyecto implementa **Rate Limiting** con `@nestjs/throttler` para proteger contra:
+- 💸 Costos económicos por abuso de recursos
+- 🔒 Ataques de fuerza bruta (brute force)
+- 🌊 Ataques DDoS
+- 🤖 Scraping automatizado
+
+**Documentación completa:** Ver [RATE-LIMITING-SUMMARY.md](./RATE-LIMITING-SUMMARY.md)
+
+### Límites Configurados
+
+- **Global:** 10 req/seg, 100 req/min, 500 req/15min
+- **Login:** 10 intentos/minuto
+- **Register:** 5 registros/minuto
+- **Booking:** 10-20 reservas/minuto
+
+### Probar Rate Limiting
+
+```bash
+# Windows PowerShell
+.\test-rate-limiting.ps1
+
+# Linux/Mac
+bash test-rate-limiting.sh
+```
 
 ## Project setup
 

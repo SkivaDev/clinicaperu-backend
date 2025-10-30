@@ -42,6 +42,7 @@ import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { CurrentUserPayload } from '../auth/types/current-user.interface';
 import { DoctorSlotOwnershipGuard } from './guards/doctor-slot-ownership.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Gestión de Citas')
 @ApiBearerAuth('bearerAuth')
@@ -64,6 +65,7 @@ export class AppointmentsController {
    * Garantiza que solo un paciente pueda reservar un slot
    */
   @Post()
+  @Throttle({ default: { ttl: 60000, limit: 10 } }) // 10 bookings por minuto
   @Roles(Role.PATIENT, Role.ADMIN)
   @ApiOperation({
     summary: 'Reservar un slot (Atomic Booking)',
@@ -110,6 +112,7 @@ export class AppointmentsController {
    * Reutiliza lógica transaccional de HU-023
    */
   @Post('doctor/appointments')
+  @Throttle({ default: { ttl: 60000, limit: 20 } }) // 20 bookings por minuto (doctores)
   @Roles(Role.DOCTOR)
   @UseGuards(DoctorSlotOwnershipGuard)
   @ApiOperation({
