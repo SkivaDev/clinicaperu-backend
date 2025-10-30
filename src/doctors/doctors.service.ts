@@ -14,6 +14,16 @@ import {
   PublicDoctorListDto,
   PublicDoctorDetailDto,
 } from './dto/public-doctor.dto';
+import {
+  DoctorStatisticsDto,
+  DateRangeEnum,
+  CurrentMonthMetricsDto,
+  HistoricalMetricsDto,
+  GeneralMetricsDto,
+  MonthlyDataDto,
+  MonthlyNoShowRateDto,
+  UpcomingAppointmentDto,
+} from './dto/doctor-statistics.dto';
 
 @Injectable()
 export class DoctorsService {
@@ -407,6 +417,311 @@ export class DoctorsService {
         startTime: schedule.startTime,
         endTime: schedule.endTime,
       })),
+    };
+  }
+
+  /**
+   * Obtiene estadísticas completas del doctor
+   * Incluye métricas del mes actual, históricas y generales
+   * Optimizado con queries SQL agregadas
+   */
+  async getStatistics(
+    doctorId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    dateRange: DateRangeEnum = DateRangeEnum.THIS_MONTH,
+  ): Promise<DoctorStatisticsDto> {
+    // Verificar que el doctor existe
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: doctorId },
+      select: { id: true, consultationPrice: true, rating: true },
+    });
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor no encontrado');
+    }
+
+    // Calcular fechas según el rango
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfCurrentMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+    );
+    const startOfPreviousMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      1,
+    );
+    const endOfPreviousMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      0,
+      23,
+      59,
+      59,
+    );
+
+    // Obtener métricas del mes actual en paralelo
+    const [currentMonthMetrics, previousMonthMetrics] = await Promise.all([
+      this.getCurrentMonthMetrics(
+        doctorId,
+        startOfCurrentMonth,
+        endOfCurrentMonth,
+        doctor.consultationPrice,
+      ),
+      this.getCurrentMonthMetrics(
+        doctorId,
+        startOfPreviousMonth,
+        endOfPreviousMonth,
+        doctor.consultationPrice,
+      ),
+    ]);
+
+    // Calcular variación vs mes anterior
+    const variationVsPreviousMonth =
+      previousMonthMetrics.totalAttended > 0
+        ? ((currentMonthMetrics.totalAttended -
+            previousMonthMetrics.totalAttended) /
+            previousMonthMetrics.totalAttended) *
+          100
+        : 0;
+
+    currentMonthMetrics.variationVsPreviousMonth = Number(
+      variationVsPreviousMonth.toFixed(2),
+    );
+
+    // Obtener métricas históricas (últimos 6 meses)
+    const historicalMetrics = await this.getHistoricalMetrics(doctorId);
+
+    // Obtener métricas generales
+    const generalMetrics = await this.getGeneralMetrics(
+      doctorId,
+      doctor.rating,
+    );
+
+    return {
+      currentMonth: currentMonthMetrics,
+      historical: historicalMetrics,
+      general: generalMetrics,
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Calcula métricas del mes actual (o cualquier rango de fechas)
+   * Usa queries optimizadas con agregaciones
+   */
+  private async getCurrentMonthMetrics(
+    doctorId: string,
+    startDate: Date,
+    endDate: Date,
+    consultationPrice: number | null,
+  ): Promise<CurrentMonthMetricsDto> {
+    // Query optimizada con agregaciones usando Prisma raw SQL
+    const metricsResult = await this.prisma.$queryRaw<
+      Array<{
+        total_attended: bigint;
+        total_cancelled: bigint;
+        total_no_shows: bigint;
+      }>
+    >`
+      SELECT 
+        COUNT(CASE WHEN status = 'ATTENDED' THEN 1 END) as total_attended,
+        COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) as total_cancelled,
+        COUNT(CASE WHEN status = 'NO_SHOW' THEN 1 END) as total_no_shows
+      FROM "Appointment"
+      WHERE "doctorId" = ${doctorId}
+        AND "createdAt" >= ${startDate}
+        AND "createdAt" <= ${endDate}
+    `;
+
+    const metrics = metricsResult[0];
+    const totalAttended = Number(metrics.total_attended);
+    const totalCancelled = Number(metrics.total_cancelled);
+    const totalNoShows = Number(metrics.total_no_shows);
+
+    // Calcular tasa de ocupación (slots booked / slots totales)
+    const occupancyResult = await this.prisma.$queryRaw<
+      Array<{
+        total_slots: bigint;
+        booked_slots: bigint;
+      }>
+    >`
+      SELECT 
+        COUNT(*) as total_slots,
+        COUNT(CASE WHEN status IN ('BOOKED', 'HELD') THEN 1 END) as booked_slots
+      FROM "Slot" s
+      INNER JOIN "Schedule" sch ON s."scheduleId" = sch.id
+      WHERE sch."doctorId" = ${doctorId}
+        AND s."startAt" >= ${startDate}
+        AND s."startAt" <= ${endDate}
+        AND s."isActive" = true
+    `;
+
+    const occupancy = occupancyResult[0];
+    const totalSlots = Number(occupancy.total_slots);
+    const bookedSlots = Number(occupancy.booked_slots);
+    const occupancyRate = totalSlots > 0 ? (bookedSlots / totalSlots) * 100 : 0;
+
+    // Calcular ingresos estimados
+    const estimatedRevenue = totalAttended * (consultationPrice || 0);
+
+    return {
+      totalAttended,
+      totalCancelled,
+      totalNoShows,
+      occupancyRate: Number(occupancyRate.toFixed(2)),
+      estimatedRevenue: Number(estimatedRevenue.toFixed(2)),
+    };
+  }
+
+  /**
+   * Obtiene métricas históricas de los últimos 6 meses
+   */
+  private async getHistoricalMetrics(
+    doctorId: string,
+  ): Promise<HistoricalMetricsDto> {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+
+    // Citas atendidas por mes
+    const attendedByMonthResult = await this.prisma.$queryRaw<
+      Array<{
+        month: string;
+        count: bigint;
+      }>
+    >`
+      SELECT 
+        TO_CHAR("createdAt", 'YYYY-MM') as month,
+        COUNT(*) as count
+      FROM "Appointment"
+      WHERE "doctorId" = ${doctorId}
+        AND status = 'ATTENDED'
+        AND "createdAt" >= ${sixMonthsAgo}
+      GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
+      ORDER BY month ASC
+    `;
+
+    const attendedByMonth: MonthlyDataDto[] = attendedByMonthResult.map(
+      (row) => ({
+        month: row.month,
+        count: Number(row.count),
+      }),
+    );
+
+    // Tasa de no-show por mes
+    const noShowRateResult = await this.prisma.$queryRaw<
+      Array<{
+        month: string;
+        total: bigint;
+        no_shows: bigint;
+      }>
+    >`
+      SELECT 
+        TO_CHAR("createdAt", 'YYYY-MM') as month,
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'NO_SHOW' THEN 1 END) as no_shows
+      FROM "Appointment"
+      WHERE "doctorId" = ${doctorId}
+        AND "createdAt" >= ${sixMonthsAgo}
+        AND status IN ('ATTENDED', 'NO_SHOW')
+      GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
+      ORDER BY month ASC
+    `;
+
+    const noShowRateByMonth: MonthlyNoShowRateDto[] = noShowRateResult.map(
+      (row) => {
+        const total = Number(row.total);
+        const noShows = Number(row.no_shows);
+        const rate = total > 0 ? (noShows / total) * 100 : 0;
+        return {
+          month: row.month,
+          rate: Number(rate.toFixed(2)),
+        };
+      },
+    );
+
+    return {
+      attendedByMonth,
+      noShowRateByMonth,
+    };
+  }
+
+  /**
+   * Obtiene métricas generales del doctor
+   */
+  private async getGeneralMetrics(
+    doctorId: string,
+    rating: number,
+  ): Promise<GeneralMetricsDto> {
+    // Total de pacientes únicos atendidos
+    const uniquePatientsResult = await this.prisma.$queryRaw<
+      Array<{
+        unique_patients: bigint;
+      }>
+    >`
+      SELECT COUNT(DISTINCT "userId") as unique_patients
+      FROM "Appointment"
+      WHERE "doctorId" = ${doctorId}
+        AND status = 'ATTENDED'
+    `;
+
+    const totalUniquePatientsAttended = Number(
+      uniquePatientsResult[0].unique_patients,
+    );
+
+    // Próximas citas (siguientes 7 días)
+    const now = new Date();
+    const sevenDaysLater = new Date(now);
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const upcomingAppointmentsData = await this.prisma.appointment.findMany({
+      where: {
+        doctorId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        slot: {
+          startAt: {
+            gte: now,
+            lte: sevenDaysLater,
+          },
+        },
+      },
+      include: {
+        slot: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        slot: {
+          startAt: 'asc',
+        },
+      },
+      take: 10, // Limitar a 10 próximas citas
+    });
+
+    const upcomingAppointments: UpcomingAppointmentDto[] =
+      upcomingAppointmentsData.map((appointment) => ({
+        id: appointment.id,
+        startAt: appointment.slot.startAt,
+        endAt: appointment.slot.endAt,
+        patientName: `${appointment.user.firstName} ${appointment.user.lastName}`,
+        reason: appointment.reason || undefined,
+      }));
+
+    return {
+      totalUniquePatientsAttended,
+      averageRating: rating > 0 ? Number(rating.toFixed(1)) : undefined,
+      upcomingAppointments,
     };
   }
 }
