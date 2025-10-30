@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
@@ -16,9 +17,15 @@ import { CalendarModule } from './calendar/calendar.module';
 import { EmailModule } from './email/email.module';
 import { UnavailabilityModule } from './unavailability/unavailability.module';
 import { PatientsModule } from './patients/patients.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
+    // Config Module - Variables de entorno
+    ConfigModule.forRoot({
+      isGlobal: true, // Hace que ConfigModule esté disponible globalmente
+      envFilePath: '.env',
+    }),
     // Rate Limiting Global - Protección contra abuso
     ThrottlerModule.forRoot([
       {
@@ -45,6 +52,7 @@ import { PatientsModule } from './patients/patients.module';
     ClinicsModule,
     DoctorsModule,
     PatientsModule,
+    UploadsModule, // HU-028: Módulo para subir archivos a S3
     AppointmentsModule,
     SchedulesModule,
     RoomsModule,
