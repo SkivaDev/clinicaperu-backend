@@ -24,12 +24,14 @@ import {
   MonthlyNoShowRateDto,
   UpcomingAppointmentDto,
 } from './dto/doctor-statistics.dto';
+import { S3Service } from 'src/common/s3/s3.service';
 
 @Injectable()
 export class DoctorsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly hashingService: HashingService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async createDoctor(dto: CreateUserDto & CreateDoctorDto) {
@@ -103,7 +105,16 @@ export class DoctorsService {
     // Excluir passwordHash del usuario
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...userWithoutPassword } = doctor.user;
-    return { ...doctor, user: userWithoutPassword };
+
+    // Generar URL prefirmada de S3 para la imagen de perfil
+    const profileImageUrl = await this.generateProfileImageUrl(
+      userWithoutPassword.profileImage,
+    );
+
+    return {
+      ...doctor,
+      user: { ...userWithoutPassword, profileImage: profileImageUrl },
+    };
   }
 
   async getDoctorIds(id: string) {
@@ -185,7 +196,15 @@ export class DoctorsService {
       return { ...updatedDoctor, user: userWithoutPassword };
     });
 
-    return result;
+    // Generar URL prefirmada de S3 para la imagen de perfil
+    const profileImageUrl = await this.generateProfileImageUrl(
+      result.user.profileImage,
+    );
+
+    return {
+      ...result,
+      user: { ...result.user, profileImage: profileImageUrl },
+    };
   }
 
   async deleteDoctor(id: string) {
@@ -198,7 +217,16 @@ export class DoctorsService {
     // Excluir passwordHash del usuario
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, ...userWithoutPassword } = doctor.user;
-    return { ...doctor, user: userWithoutPassword };
+
+    // Generar URL prefirmada de S3 para la imagen de perfil
+    const profileImageUrl = await this.generateProfileImageUrl(
+      userWithoutPassword.profileImage,
+    );
+
+    return {
+      ...doctor,
+      user: { ...userWithoutPassword, profileImage: profileImageUrl },
+    };
   }
 
   async listDoctors() {
@@ -206,12 +234,23 @@ export class DoctorsService {
       include: { user: true, clinic: true, specialty: true },
     });
 
-    // Excluir passwordHash de cada usuario
-    return doctors.map((doctor) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...userWithoutPassword } = doctor.user;
-      return { ...doctor, user: userWithoutPassword };
-    });
+    // Excluir passwordHash de cada usuario y generar URLs de S3
+    return Promise.all(
+      doctors.map(async (doctor) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+        // Generar URL prefirmada de S3 para la imagen de perfil
+        const profileImageUrl = await this.generateProfileImageUrl(
+          userWithoutPassword.profileImage,
+        );
+
+        return {
+          ...doctor,
+          user: { ...userWithoutPassword, profileImage: profileImageUrl },
+        };
+      }),
+    );
   }
 
   async listDoctorsByClinic(clinicId: string) {
@@ -240,6 +279,30 @@ export class DoctorsService {
       const { passwordHash, ...userWithoutPassword } = doctor.user;
       return { ...doctor, user: userWithoutPassword };
     });
+  }
+
+  /**
+   * Helper: Genera URL prefirmada de S3 para profileImage
+   * Si la imagen no existe o falla, retorna null
+   */
+  private async generateProfileImageUrl(
+    profileImage: string | null,
+  ): Promise<string | null> {
+    if (!profileImage) {
+      return null;
+    }
+
+    try {
+      // Generar URL prefirmada con expiración de 1 hora (3600 segundos)
+      const signedUrl = await this.s3Service.generateDownloadUrl(
+        profileImage,
+        3600,
+      );
+      return signedUrl;
+    } catch {
+      // Si falla, retornar null (la imagen no se mostrará)
+      return null;
+    }
   }
 
   // Métodos públicos para el controlador público
@@ -315,33 +378,39 @@ export class DoctorsService {
       this.prisma.doctor.count({ where }),
     ]);
 
-    const data: PublicDoctorListDto[] = doctors.map((doctor) => ({
-      id: doctor.id,
-      cmp: doctor.cmp,
-      yearsOfExperience: doctor.yearsOfExperience || null,
-      consultationPrice: doctor.consultationPrice || null,
-      attendedPatients: doctor.attendedPatients,
-      rating: doctor.rating > 0 ? doctor.rating : undefined,
-      // attendedAppointments: doctor.attendedAppointments,
-      // totalAppointments: doctor.appointments.length,
-      user: {
-        id: doctor.user.id,
-        firstName: doctor.user.firstName,
-        lastName: doctor.user.lastName,
-        profileImage: doctor.user.profileImage,
-        email: doctor.user.email,
-        phone: doctor.user.phone || null,
-      },
-      specialty: {
-        id: doctor.specialty.id,
-        name: doctor.specialty.name,
-      },
-      clinic: {
-        id: doctor.clinic.id,
-        name: doctor.clinic.name,
-      },
-      // totalAppointments: doctor.appointments.length,
-    }));
+    // Generar URLs prefirmadas de S3 para las imágenes de perfil
+    const data: PublicDoctorListDto[] = await Promise.all(
+      doctors.map(async (doctor) => {
+        const profileImageUrl = await this.generateProfileImageUrl(
+          doctor.user.profileImage,
+        );
+
+        return {
+          id: doctor.id,
+          cmp: doctor.cmp,
+          yearsOfExperience: doctor.yearsOfExperience || null,
+          consultationPrice: doctor.consultationPrice || null,
+          attendedPatients: doctor.attendedPatients,
+          rating: doctor.rating > 0 ? doctor.rating : undefined,
+          user: {
+            id: doctor.user.id,
+            firstName: doctor.user.firstName,
+            lastName: doctor.user.lastName,
+            profileImage: profileImageUrl,
+            email: doctor.user.email,
+            phone: doctor.user.phone || null,
+          },
+          specialty: {
+            id: doctor.specialty.id,
+            name: doctor.specialty.name,
+          },
+          clinic: {
+            id: doctor.clinic.id,
+            name: doctor.clinic.name,
+          },
+        };
+      }),
+    );
 
     return {
       data,
@@ -387,6 +456,11 @@ export class DoctorsService {
 
     const rating = doctor.rating > 0 ? doctor.rating : undefined;
 
+    // Generar URL prefirmada de S3 para la imagen de perfil
+    const profileImageUrl = await this.generateProfileImageUrl(
+      doctor.user.profileImage,
+    );
+
     return {
       id: doctor.id,
       cmp: doctor.cmp,
@@ -398,7 +472,7 @@ export class DoctorsService {
         id: doctor.user.id,
         firstName: doctor.user.firstName,
         lastName: doctor.user.lastName,
-        profileImage: doctor.user.profileImage,
+        profileImage: profileImageUrl,
         email: doctor.user.email,
         phone: doctor.user.phone || null,
       },

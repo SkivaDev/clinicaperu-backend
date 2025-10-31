@@ -1,7 +1,7 @@
 import {
   Body,
   Controller,
-  Get,
+  // Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -13,8 +13,8 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBody,
-  ApiBearerAuth,
-  ApiCookieAuth,
+  // ApiBearerAuth,
+  // ApiCookieAuth,
   ApiUnauthorizedResponse,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -25,13 +25,13 @@ import { RegisterDto } from 'src/auth/dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser } from './types/user-without-password';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { Role } from '@prisma/client';
-import { CurrentUser } from './decorators/user.decorator';
-import { Roles } from './decorators/roles.decorator';
-import type { CurrentUserPayload } from './types/current-user.interface';
-import { first } from 'rxjs';
+// import { JwtAuthGuard } from './guards/jwt-auth.guard';
+// import { RolesGuard } from './guards/roles.guard';
+// import { Role } from '@prisma/client';
+// import { CurrentUser } from './decorators/user.decorator';
+// import { Roles } from './decorators/roles.decorator';
+// import type { CurrentUserPayload } from './types/current-user.interface';
+// import { first } from 'rxjs';
 
 @ApiTags('Autenticación')
 @Controller('auth')
@@ -128,161 +128,161 @@ export class AuthController {
     };
   }
 
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({
-    summary: 'Obtener perfil del usuario',
-    description: 'Retorna la información del perfil del usuario autenticado',
-  })
-  @ApiBearerAuth('bearerAuth')
-  @ApiCookieAuth('cookieAuth')
-  @ApiOkResponse({
-    description: 'Perfil obtenido exitosamente',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Perfil obtenido correctamente',
-        data: {
-          userId: 'uuid-here',
-          dni: '12345678',
-          email: 'usuario@example.com',
-          firstName: 'Juan',
-          lastName: 'Pérez',
-          role: 'PATIENT',
-        },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado',
-  })
-  async getProfile(@Request() req) {
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Perfil obtenido correctamente',
-      data: req.user,
-    };
-  }
+  // @Get('profile')
+  // @UseGuards(JwtAuthGuard)
+  // @ApiOperation({
+  //   summary: 'Obtener perfil del usuario',
+  //   description: 'Retorna la información del perfil del usuario autenticado',
+  // })
+  // @ApiBearerAuth('bearerAuth')
+  // @ApiCookieAuth('cookieAuth')
+  // @ApiOkResponse({
+  //   description: 'Perfil obtenido exitosamente',
+  //   schema: {
+  //     example: {
+  //       statusCode: 200,
+  //       message: 'Perfil obtenido correctamente',
+  //       data: {
+  //         userId: 'uuid-here',
+  //         dni: '12345678',
+  //         email: 'usuario@example.com',
+  //         firstName: 'Juan',
+  //         lastName: 'Pérez',
+  //         role: 'PATIENT',
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiUnauthorizedResponse({
+  //   description: 'Token JWT inválido o expirado',
+  // })
+  // async getProfile(@Request() req) {
+  //   return {
+  //     statusCode: HttpStatus.OK,
+  //     message: 'Perfil obtenido correctamente',
+  //     data: req.user,
+  //   };
+  // }
 
-  @Get('admin/dashboard')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({
-    summary: 'Dashboard de administrador',
-    description:
-      'Obtiene el dashboard con funcionalidades específicas para administradores',
-  })
-  @ApiBearerAuth('bearerAuth')
-  @ApiCookieAuth('cookieAuth')
-  @ApiOkResponse({
-    description: 'Dashboard admin obtenido exitosamente',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Dashboard admin',
-        data: {
-          user: {
-            id: 'uuid-here',
-            dni: '12345678',
-            role: 'ADMIN',
-          },
-          adminFeatures: [
-            'Gestión de usuarios',
-            'Gestión de citas',
-            'Gestión de doctores',
-            'Reportes y estadísticas',
-          ],
-        },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Acceso denegado - Se requiere rol de ADMIN',
-  })
-  async getAdminDashboard(@CurrentUser() user: CurrentUserPayload) {
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Dashboard admin',
-      data: {
-        user: {
-          id: user.userId,
-          dni: user.dni,
-          role: user.role,
-        },
-        adminFeatures: [
-          'Gestión de usuarios',
-          'Gestión de citas',
-          'Gestión de doctores',
-          'Reportes y estadísticas',
-        ],
-      },
-    };
-  }
+  //   @Get('admin/dashboard')
+  //   @UseGuards(JwtAuthGuard, RolesGuard)
+  //   @Roles(Role.ADMIN)
+  //   @ApiOperation({
+  //     summary: 'Dashboard de administrador',
+  //     description:
+  //       'Obtiene el dashboard con funcionalidades específicas para administradores',
+  //   })
+  //   @ApiBearerAuth('bearerAuth')
+  //   @ApiCookieAuth('cookieAuth')
+  //   @ApiOkResponse({
+  //     description: 'Dashboard admin obtenido exitosamente',
+  //     schema: {
+  //       example: {
+  //         statusCode: 200,
+  //         message: 'Dashboard admin',
+  //         data: {
+  //           user: {
+  //             id: 'uuid-here',
+  //             dni: '12345678',
+  //             role: 'ADMIN',
+  //           },
+  //           adminFeatures: [
+  //             'Gestión de usuarios',
+  //             'Gestión de citas',
+  //             'Gestión de doctores',
+  //             'Reportes y estadísticas',
+  //           ],
+  //         },
+  //       },
+  //     },
+  //   })
+  //   @ApiUnauthorizedResponse({
+  //     description: 'Token JWT inválido o expirado',
+  //   })
+  //   @ApiResponse({
+  //     status: 403,
+  //     description: 'Acceso denegado - Se requiere rol de ADMIN',
+  //   })
+  //   async getAdminDashboard(@CurrentUser() user: CurrentUserPayload) {
+  //     return {
+  //       statusCode: HttpStatus.OK,
+  //       message: 'Dashboard admin',
+  //       data: {
+  //         user: {
+  //           id: user.userId,
+  //           dni: user.dni,
+  //           role: user.role,
+  //         },
+  //         adminFeatures: [
+  //           'Gestión de usuarios',
+  //           'Gestión de citas',
+  //           'Gestión de doctores',
+  //           'Reportes y estadísticas',
+  //         ],
+  //       },
+  //     };
+  //   }
 
-  /**
-   * 🔹 DASHBOARD PACIENTE - GET /auth/patient/dashboard
-   * Solo accesible para usuarios con rol PATIENT
-   */
-  @Get('patient/dashboard')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.PATIENT)
-  @ApiOperation({
-    summary: 'Dashboard de paciente',
-    description:
-      'Obtiene el dashboard con funcionalidades específicas para pacientes',
-  })
-  @ApiBearerAuth('bearerAuth')
-  @ApiCookieAuth('cookieAuth')
-  @ApiOkResponse({
-    description: 'Dashboard patient obtenido exitosamente',
-    schema: {
-      example: {
-        statusCode: 200,
-        message: 'Dashboard patient',
-        data: {
-          user: {
-            id: 'uuid-here',
-            dni: '12345678',
-            role: 'PATIENT',
-          },
-          patientFeatures: [
-            'Mis citas',
-            'Reservar cita',
-            'Historial médico',
-            'Perfil personal',
-          ],
-        },
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Token JWT inválido o expirado',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Acceso denegado - Se requiere rol de PATIENT',
-  })
-  async getPatientDashboard(@CurrentUser() user: CurrentUserPayload) {
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Dashboard patient',
-      data: {
-        user: {
-          id: user.userId,
-          dni: user.dni,
-          role: user.role,
-        },
-        patientFeatures: [
-          'Mis citas',
-          'Reservar cita',
-          'Historial médico',
-          'Perfil personal',
-        ],
-      },
-    };
-  }
+  //   /**
+  //    * 🔹 DASHBOARD PACIENTE - GET /auth/patient/dashboard
+  //    * Solo accesible para usuarios con rol PATIENT
+  //    */
+  // @Get('patient/dashboard')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(Role.PATIENT)
+  // @ApiOperation({
+  //   summary: 'Dashboard de paciente',
+  //   description:
+  //     'Obtiene el dashboard con funcionalidades específicas para pacientes',
+  // })
+  // @ApiBearerAuth('bearerAuth')
+  // @ApiCookieAuth('cookieAuth')
+  // @ApiOkResponse({
+  //   description: 'Dashboard patient obtenido exitosamente',
+  //   schema: {
+  //     example: {
+  //       statusCode: 200,
+  //       message: 'Dashboard patient',
+  //       data: {
+  //         user: {
+  //           id: 'uuid-here',
+  //           dni: '12345678',
+  //           role: 'PATIENT',
+  //         },
+  //         patientFeatures: [
+  //           'Mis citas',
+  //           'Reservar cita',
+  //           'Historial médico',
+  //           'Perfil personal',
+  //         ],
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiUnauthorizedResponse({
+  //   description: 'Token JWT inválido o expirado',
+  // })
+  // @ApiResponse({
+  //   status: 403,
+  //   description: 'Acceso denegado - Se requiere rol de PATIENT',
+  // })
+  // async getPatientDashboard(@CurrentUser() user: CurrentUserPayload) {
+  //   return {
+  //     statusCode: HttpStatus.OK,
+  //     message: 'Dashboard patient',
+  //     data: {
+  //       user: {
+  //         id: user.userId,
+  //         dni: user.dni,
+  //         role: user.role,
+  //       },
+  //       patientFeatures: [
+  //         'Mis citas',
+  //         'Reservar cita',
+  //         'Historial médico',
+  //         'Perfil personal',
+  //       ],
+  //     },
+  //   };
+  // }
 }
