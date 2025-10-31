@@ -5,10 +5,26 @@ export type EventType = 'slot' | 'appointment';
 
 export class DoctorInfoDto {
   id: string;
+  cmp: number;
+  user: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export class SpecialtyInfoDto {
+  id: string;
   name: string;
 }
 
 export class PatientInfoDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  // dni: string;
+}
+
+export class ClinicInfoDto {
   id: string;
   name: string;
 }
@@ -16,10 +32,12 @@ export class PatientInfoDto {
 export class CalendarEventDto {
   id: string;
   type: EventType;
-  start: string; // ISO 8601 format
-  end: string; // ISO 8601 format
+  startAt: string; // ISO 8601 format
+  endAt: string; // ISO 8601 format
   status: SlotStatus | AppointmentStatus;
   doctor?: DoctorInfoDto;
+  specialty?: SpecialtyInfoDto;
+  clinic?: ClinicInfoDto;
   patient?: PatientInfoDto;
 }
 

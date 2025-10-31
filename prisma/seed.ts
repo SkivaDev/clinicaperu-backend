@@ -37,7 +37,7 @@ async function main() {
       gender: 'MALE',
       role: 'PATIENT',
       profileImage:
-        'https://w7.pngwing.com/pngs/791/121/png-transparent-health-care-medicine-physician-patient-contract-research-organization-infirm-text-hospital-surgery.png',
+        'profile-images/559108b2-ca0b-4b1f-a565-6ebd8e4fac77/27955300-5484-4703-9036-159ce1135977-hgost.jpg',
     },
   });
 
@@ -497,7 +497,7 @@ async function main() {
       gender: 'MALE',
       role: 'DOCTOR',
       profileImage:
-        'https://static.vecteezy.com/system/resources/thumbnails/026/375/249/small_2x/ai-generative-portrait-of-confident-male-doctor-in-white-coat-and-stethoscope-standing-with-arms-crossed-and-looking-at-camera-photo.jpg',
+        'profile-images/7e1914c9-958e-4702-93d9-3e4e1292d4e8/9da7c04f-6c12-4162-ba94-43ac2ccd334c-avatar-doctor.webp',
     },
   });
 

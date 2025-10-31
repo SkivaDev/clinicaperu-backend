@@ -358,6 +358,18 @@ export class CalendarService {
                       lastName: true,
                     },
                   },
+                  specialty: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                  clinic: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
                 },
               },
             },
@@ -382,6 +394,18 @@ export class CalendarService {
                           lastName: true,
                         },
                       },
+                      specialty: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                      clinic: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
                     },
                   },
                 },
@@ -404,6 +428,8 @@ export class CalendarService {
       }),
     ]);
 
+    // console.log(slots.map((slot) => slot.schedule.doctor));
+
     // Transformar slots a eventos
     const slotEvents: CalendarEventDto[] = slots
       .filter((slot) => slot.status === SlotStatus.FREE) // Solo slots libres
@@ -416,7 +442,7 @@ export class CalendarService {
 
     // Combinar y ordenar eventos
     const allEvents = [...slotEvents, ...appointmentEvents].sort(
-      (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
     );
 
     // Aplicar paginación
@@ -439,17 +465,29 @@ export class CalendarService {
    * Transforma un Slot en un CalendarEventDto
    */
   private transformSlotToEvent(slot: any): CalendarEventDto {
-    const doctorName = `${slot.schedule.doctor.user.firstName} ${slot.schedule.doctor.user.lastName}`;
+    // const doctorName = `${slot.schedule.doctor.user.firstName} ${slot.schedule.doctor.user.lastName}`;
 
     return {
       id: slot.id,
       type: 'slot',
-      start: slot.startAt.toISOString(),
-      end: slot.endAt.toISOString(),
+      startAt: slot.startAt.toISOString(),
+      endAt: slot.endAt.toISOString(),
       status: slot.status,
       doctor: {
         id: slot.schedule.doctor.id,
-        name: doctorName,
+        cmp: slot.schedule.doctor.cmp,
+        user: {
+          firstName: slot.schedule.doctor.user.firstName,
+          lastName: slot.schedule.doctor.user.lastName,
+        },
+      },
+      specialty: {
+        id: slot.schedule.doctor.specialty.id,
+        name: slot.schedule.doctor.specialty.name,
+      },
+      clinic: {
+        id: slot.schedule.doctor.clinic.id,
+        name: slot.schedule.doctor.clinic.name,
       },
     };
   }
@@ -458,22 +496,35 @@ export class CalendarService {
    * Transforma un Appointment en un CalendarEventDto
    */
   private transformAppointmentToEvent(appointment: any): CalendarEventDto {
-    const doctorName = `${appointment.slot.schedule.doctor.user.firstName} ${appointment.slot.schedule.doctor.user.lastName}`;
-    const patientName = `${appointment.user.firstName} ${appointment.user.lastName}`;
+    // const doctorName = `${appointment.slot.schedule.doctor.user.firstName} ${appointment.slot.schedule.doctor.user.lastName}`;
+    // const patientName = `${appointment.user.firstName} ${appointment.user.lastName}`;
 
     return {
       id: appointment.id,
       type: 'appointment',
-      start: appointment.slot.startAt.toISOString(),
-      end: appointment.slot.endAt.toISOString(),
+      startAt: appointment.slot.startAt.toISOString(),
+      endAt: appointment.slot.endAt.toISOString(),
       status: appointment.status,
       doctor: {
         id: appointment.slot.schedule.doctor.id,
-        name: doctorName,
+        cmp: appointment.slot.schedule.doctor.cmp,
+        user: {
+          firstName: appointment.slot.schedule.doctor.user.firstName,
+          lastName: appointment.slot.schedule.doctor.user.lastName,
+        },
+      },
+      specialty: {
+        id: appointment.slot.schedule.doctor.specialty.id,
+        name: appointment.slot.schedule.doctor.specialty.name,
+      },
+      clinic: {
+        id: appointment.slot.schedule.doctor.clinic.id,
+        name: appointment.slot.schedule.doctor.clinic.name,
       },
       patient: {
         id: appointment.user.id,
-        name: patientName,
+        firstName: appointment.user.firstName,
+        lastName: appointment.user.lastName,
       },
     };
   }
