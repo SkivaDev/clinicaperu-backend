@@ -8,13 +8,11 @@ import {
   GetCalendarQueryDto,
 } from './dto/get-calendar-query.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, SlotStatus, AppointmentStatus } from '@prisma/client';
+import { Prisma, SlotStatus } from '@prisma/client';
 import { CalendarQueryDto } from './dto/calendar-query.dto';
 import {
   CalendarEventsResponseDto,
   CalendarEventDto,
-  DoctorInfoDto,
-  PatientInfoDto,
 } from './dto/calendar-event.dto';
 
 @Injectable()
@@ -22,9 +20,9 @@ export class CalendarService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getCalendar(query: GetCalendarQueryDto): Promise<CalendarResponseDto> {
-    const { start, view, scope, doctorId, clinicId } = query;
+    const { start, end, view, scope, doctorId, clinicId } = query;
 
-    const dateRange = this.calculateDateRange(start, view);
+    const dateRange = this.calculateDateRangeFromQuery(start, end, view);
     const slots = await this.getCalendarSlots(dateRange, {
       doctorId,
       clinicId,
@@ -59,7 +57,11 @@ export class CalendarService {
       doctorId = doctor.id;
     }
 
-    const dateRange = this.calculateDateRange(query.start, query.view);
+    const dateRange = this.calculateDateRangeFromQuery(
+      query.start,
+      query.end,
+      query.view,
+    );
     const slots = await this.getCalendarSlots(dateRange, {
       doctorId,
       scope: CalendarScope.DOCTOR,
@@ -202,6 +204,31 @@ export class CalendarService {
     };
   }
 
+  /**
+   * Calcula el rango de fechas basado en end (personalizado) o view (predefinido)
+   * Prioriza end si está presente, sino usa view para calcularlo
+   * Si no viene ninguno, usa 'day' por defecto
+   */
+  private calculateDateRangeFromQuery(
+    start: string,
+    end?: string,
+    view?: string,
+  ): { start: Date; end: Date } {
+    const startDate = new Date(start);
+
+    // Si viene end, usarlo (rango personalizado)
+    if (end) {
+      return {
+        start: startDate,
+        end: new Date(end),
+      };
+    }
+
+    // Si no viene end, calcular basado en view (vistas predefinidas)
+    // Si no viene view tampoco, usar 'day' por defecto
+    return this.calculateDateRange(start, view || 'day');
+  }
+
   private calculateDateRange(
     start: string,
     view: string,
@@ -259,7 +286,11 @@ export class CalendarService {
     query: GetCalendarQueryDto,
     patientUserId?: string,
   ): Promise<CalendarResponseDto> {
-    const dateRange = this.calculateDateRange(query.start, query.view);
+    const dateRange = this.calculateDateRangeFromQuery(
+      query.start,
+      query.end,
+      query.view,
+    );
     const slots = await this.getCalendarSlots(dateRange, {
       clinicId: query.clinicId,
       scope: CalendarScope.PATIENT,
@@ -288,14 +319,17 @@ export class CalendarService {
       patientId,
       start,
       end,
+      view,
       status,
       appointmentStatus,
       limit = 500,
       offset = 0,
     } = query;
 
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    // Calcular rango de fechas (soporta end personalizado o view predefinido)
+    const dateRange = this.calculateDateRangeFromQuery(start, end, view);
+    const startDate = dateRange.start;
+    const endDate = dateRange.end;
 
     // Query builder para slots
     const slotWhere: Prisma.SlotWhereInput = {

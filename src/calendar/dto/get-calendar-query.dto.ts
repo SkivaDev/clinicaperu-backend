@@ -17,8 +17,13 @@ export class GetCalendarQueryDto {
   @IsDateString()
   start: string;
 
+  @IsDateString()
+  @IsOptional()
+  end?: string;
+
   @IsEnum(CalendarView)
-  view: CalendarView;
+  @IsOptional()
+  view?: CalendarView;
 
   @IsEnum(CalendarScope)
   @IsOptional()

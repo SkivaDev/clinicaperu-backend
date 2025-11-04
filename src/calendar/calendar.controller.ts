@@ -1,19 +1,12 @@
 import {
   Controller,
   Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
   UseGuards,
   Query,
   HttpStatus,
   UseInterceptors,
 } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
-import { CreateCalendarDto } from './dto/create-calendar.dto';
-import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -42,8 +35,9 @@ export class CalendarController {
   //   return this.calendarService.findAll();
   // }
 
+  // Para admin (filtros manuales)
   @Get()
-  @Roles(Role.DOCTOR, Role.PATIENT, Role.ADMIN)
+  @Roles(Role.ADMIN)
   async getCalendar(
     @Query() query: GetCalendarQueryDto,
   ): Promise<ResponseDto<CalendarResponseDto>> {
@@ -55,6 +49,7 @@ export class CalendarController {
     };
   }
 
+  // Para doctor (filtros automaticos)
   @Get('doctor')
   @Roles(Role.DOCTOR)
   async getDoctorCalendar(
@@ -72,6 +67,7 @@ export class CalendarController {
     };
   }
 
+  // Para patient (filtros automaticos)
   @Get('patient')
   @Roles(Role.PATIENT)
   async getPatientCalendar(

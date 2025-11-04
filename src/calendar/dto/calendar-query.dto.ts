@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SlotStatus, AppointmentStatus } from '@prisma/client';
+import { CalendarView } from './get-calendar-query.dto';
 
 export class CalendarQueryDto {
   @IsOptional()
@@ -24,7 +25,12 @@ export class CalendarQueryDto {
   start: string;
 
   @IsDateString()
-  end: string;
+  @IsOptional()
+  end?: string;
+
+  @IsEnum(CalendarView)
+  @IsOptional()
+  view?: CalendarView;
 
   @IsOptional()
   @IsEnum(SlotStatus)
