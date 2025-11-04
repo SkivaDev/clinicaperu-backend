@@ -9,6 +9,7 @@ import {
   Req,
   Delete,
   Put,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,15 +26,11 @@ import {
 } from '@nestjs/swagger';
 import { AppointmentsService } from './appointments.service';
 import { BookingService } from './booking.service';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
-import { CalendarQueryDto } from './dto/calendar-query.dto';
-import { CalendarEventDto } from './dto/calendar-event.dto';
-import { AppointmentEntity } from './entities/appointment.entity';
 import { ResponseDto } from '../common/dto/response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role, AppointmentStatus } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
 import { BookAppointmentDto } from './dto/book-appointment.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
@@ -96,6 +93,7 @@ export class AppointmentsController {
     const appointment = await this.bookingService.bookSlot(
       user.userId,
       bookingDto,
+      user.role as 'PATIENT' | 'ADMIN',
       requestId,
     );
 
@@ -227,23 +225,53 @@ export class AppointmentsController {
     };
   }
 
-  //   @Patch(':id/status')
-  //   @Roles(Role.DOCTOR, Role.ADMIN)
-  //   async updateAppointmentStatus(
-  //     @Param('id') id: string,
-  //     @Body('status') status: AppointmentStatus,
-  //   ): Promise<ResponseDto<AppointmentEntity>> {
-  //     const appointment = await this.appointmentsService.updateAppointmentStatus(
-  //       id,
-  //       status,
-  //     );
+  /**
+   * Confirma una cita que está en estado PENDING
+   * Solo el paciente propietario puede confirmar su cita
+   */
+  @Patch(':id/confirm')
+  @Roles(Role.PATIENT, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Confirmar una cita pendiente',
+    description:
+      'Confirma una cita que está en estado PENDING. Solo el paciente propietario puede confirmar su cita. Los admins también pueden confirmar cualquier cita.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único de la cita a confirmar',
+    example: 'uuid-here',
+  })
+  @ApiOkResponse({
+    description: 'Cita confirmada exitosamente',
+    type: ResponseDto<AppointmentResponseDto>,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'La cita no está en estado PENDING o no se puede confirmar',
+  })
+  @ApiForbiddenResponse({
+    description: 'Solo el paciente propietario puede confirmar esta cita',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cita no encontrada',
+  })
+  async confirmAppointment(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<AppointmentResponseDto>> {
+    const appointment = await this.appointmentsService.confirmAppointment(
+      id,
+      user.userId,
+      user.role,
+    );
 
-  //     return {
-  //       statusCode: HttpStatus.OK,
-  //       message: 'Appointment status updated successfully',
-  //       data: appointment,
-  //     };
-  //   }
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Cita confirmada exitosamente',
+      data: appointment,
+    };
+  }
 
   /**
    * HU-026: DELETE /appointments/:id - Cancelar cita

@@ -620,4 +620,89 @@ export class AppointmentsService {
       return updatedAppointment;
     });
   }
+
+  /**
+   * Confirma una cita que está en estado PENDING
+   * Solo el paciente propietario puede confirmar su cita
+   * Cambia el estado de PENDING a CONFIRMED y establece confirmedAt
+   */
+  async confirmAppointment(
+    appointmentId: string,
+    userId: string,
+    userRole: Role,
+  ): Promise<AppointmentResponseDto> {
+    this.logger.log(
+      `User ${userId} (${userRole}) attempting to confirm appointment ${appointmentId}`,
+    );
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Obtener la cita con todas las relaciones necesarias
+      const appointment = await tx.appointment.findUnique({
+        where: { id: appointmentId },
+        include: {
+          slot: true,
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          doctor: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+              specialty: { select: { name: true } },
+            },
+          },
+        },
+      });
+
+      if (!appointment) {
+        throw new NotFoundException('Cita no encontrada');
+      }
+
+      // 2. Validar que la cita esté en estado PENDING
+      if (appointment.status !== AppointmentStatus.PENDING) {
+        throw new BadRequestException(
+          `No se puede confirmar una cita con estado ${appointment.status}. Solo se pueden confirmar citas en estado PENDING.`,
+        );
+      }
+
+      // 3. Validar ownership: solo el paciente propietario puede confirmar
+      const isPatientOwner = appointment.userId === userId;
+      const isAdmin = userRole === Role.ADMIN;
+
+      if (!isPatientOwner && !isAdmin) {
+        throw new ForbiddenException(
+          'Solo el paciente propietario puede confirmar esta cita',
+        );
+      }
+
+      // 4. Actualizar el estado de la cita a CONFIRMED
+      const updatedAppointment = await tx.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: AppointmentStatus.CONFIRMED,
+          confirmedAt: new Date(),
+        },
+      });
+
+      // 5. Encolar email de confirmación al paciente
+      await tx.emailMessage.create({
+        data: {
+          to: appointment.user.email,
+          subject: 'Cita confirmada',
+          template: 'BOOKING_CONFIRMATION',
+          status: 'PENDING',
+          variables: {
+            patientName: `${appointment.user.firstName} ${appointment.user.lastName}`,
+            doctorName: `${appointment.doctor.user.firstName} ${appointment.doctor.user.lastName}`,
+            specialty: appointment.doctor.specialty.name,
+            appointmentDate: appointment.slot.startAt.toISOString(),
+            confirmedAt: new Date().toISOString(),
+          },
+        },
+      });
+
+      this.logger.log(
+        `Appointment ${appointmentId} confirmed successfully by user ${userId} (${userRole})`,
+      );
+
+      return updatedAppointment;
+    });
+  }
 }

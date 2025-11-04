@@ -21,36 +21,45 @@ export class BookingService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * HU-023: Atomic Booking - Reserva un slot de forma atómica (Patient)
+   * HU-023: Atomic Booking - Reserva un slot de forma atómica (Patient o Admin)
    * Garantiza que solo un paciente pueda reservar un slot específico
    * Maneja concurrencia con FOR UPDATE y retry en deadlocks
+   *
+   * Estado inicial:
+   * - PATIENT: CONFIRMED (auto-confirmación)
+   * - ADMIN: CONFIRMED (auto-confirmación)
    */
   async bookSlot(
     userId: string,
     bookingDto: BookAppointmentDto,
+    userRole: 'PATIENT' | 'ADMIN',
     requestId?: string,
   ): Promise<BookingResponseDto> {
     const logContext = requestId ? `[${requestId}]` : '';
     this.logger.log(
-      `${logContext} Starting atomic booking for user ${userId}, slot ${bookingDto.slotId}`,
+      `${logContext} Starting atomic booking for user ${userId} (${userRole}), slot ${bookingDto.slotId}`,
     );
 
+    // Paciente o Admin crean citas CONFIRMED automáticamente
+    const initialStatus = AppointmentStatus.CONFIRMED;
+    const shouldSetConfirmedAt = true;
+
     let attempt = 0;
-    let lastError: Error | null = null;
 
     while (attempt <= this.MAX_RETRIES) {
       try {
         const result = await this.executeBookingTransaction(
           userId,
           bookingDto,
+          initialStatus,
+          shouldSetConfirmedAt,
           requestId,
         );
         this.logger.log(
-          `${logContext} Booking completed successfully: appointment ${result.id}`,
+          `${logContext} Booking completed successfully: appointment ${result.id} with status ${initialStatus}`,
         );
         return result;
       } catch (error) {
-        lastError = error;
 
         // Si es un deadlock, reintentar
         if (this.isDeadlockError(error) && attempt < this.MAX_RETRIES) {
@@ -80,6 +89,8 @@ export class BookingService {
    * HU-024: Doctor Books for Patient - Doctor reserva slot para un paciente
    * Reutiliza la misma lógica transaccional que HU-023
    * Validación adicional: el slot debe pertenecer al doctor
+   *
+   * Estado inicial: PENDING (el paciente debe confirmar)
    */
   async bookSlotForPatient(
     patientId: string,
@@ -93,6 +104,10 @@ export class BookingService {
       `${logContext} Doctor booking slot ${slotId} for patient ${patientId}`,
     );
 
+    // Doctor crea citas PENDING - el paciente debe confirmar
+    const initialStatus = AppointmentStatus.PENDING;
+    const shouldSetConfirmedAt = false;
+
     // Reutilizar la misma lógica de booking
     const bookingDto: BookAppointmentDto = {
       slotId,
@@ -101,21 +116,21 @@ export class BookingService {
     };
 
     let attempt = 0;
-    let lastError: Error | null = null;
 
     while (attempt <= this.MAX_RETRIES) {
       try {
         const result = await this.executeBookingTransaction(
           patientId,
           bookingDto,
+          initialStatus,
+          shouldSetConfirmedAt,
           requestId,
         );
         this.logger.log(
-          `${logContext} Doctor booking completed successfully: appointment ${result.id}`,
+          `${logContext} Doctor booking completed successfully: appointment ${result.id} with status ${initialStatus}`,
         );
         return result;
       } catch (error) {
-        lastError = error;
 
         // Si es un deadlock, reintentar
         if (this.isDeadlockError(error) && attempt < this.MAX_RETRIES) {
@@ -141,10 +156,14 @@ export class BookingService {
 
   /**
    * Ejecuta la transacción de booking con todas las validaciones
+   * @param initialStatus Estado inicial de la cita (CONFIRMED para paciente/admin, PENDING para doctor)
+   * @param shouldSetConfirmedAt Si debe establecer confirmedAt al crear la cita
    */
   private async executeBookingTransaction(
     patientId: string,
     bookingDto: BookAppointmentDto,
+    initialStatus: AppointmentStatus,
+    shouldSetConfirmedAt: boolean,
     requestId?: string,
   ): Promise<BookingResponseDto> {
     const logContext = requestId ? `[${requestId}]` : '';
@@ -203,16 +222,26 @@ export class BookingService {
             throw new BadRequestException('Doctor not found');
           }
 
-          // 5. Crear la cita
+          // 5. Crear la cita con el estado inicial apropiado
+          const appointmentData: any = {
+            userId: patientId,
+            doctorId: slot.doctorId,
+            slotId: bookingDto.slotId,
+            reason: bookingDto.reason,
+            notes: bookingDto.notes,
+            status: initialStatus,
+          };
+
+          // Si es CONFIRMED, establecer confirmedAt
+          if (
+            shouldSetConfirmedAt &&
+            initialStatus === AppointmentStatus.CONFIRMED
+          ) {
+            appointmentData.confirmedAt = new Date();
+          }
+
           const appointment = await tx.appointment.create({
-            data: {
-              userId: patientId,
-              doctorId: slot.doctorId,
-              slotId: bookingDto.slotId,
-              reason: bookingDto.reason,
-              notes: bookingDto.notes,
-              status: AppointmentStatus.PENDING,
-            },
+            data: appointmentData,
           });
 
           // 6. Actualizar el slot a BOOKED
@@ -223,16 +252,32 @@ export class BookingService {
             },
           });
 
-          // 7. Encolar email de confirmación (simulado con registro en tabla)
+          // 7. Obtener información del paciente para el email
+          const patient = await tx.user.findUnique({
+            where: { id: patientId },
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          });
+
+          // 8. Encolar email según el estado de la cita
           await this.enqueueConfirmationEmail(
             tx,
             appointment.id,
-            patientId,
-            slot,
+            appointment.status,
+            patient?.email || '',
+            patient?.firstName || '',
+            patient?.lastName || '',
+            doctor.user.firstName,
+            doctor.user.lastName,
+            doctor.specialty.name,
+            slot.startAt,
             logContext,
           );
 
-          // 8. Registrar en audit log
+          // 9. Registrar en audit log
           await this.logBookingAudit(
             tx,
             appointment.id,
@@ -366,25 +411,67 @@ export class BookingService {
   }
 
   /**
-   * Encola un email de confirmación
-   * En producción, esto debería usar una cola como Bull/BullMQ
+   * Encola un email según el estado de la cita
+   * - CONFIRMED: Email de confirmación inmediata
+   * - PENDING: Email pidiendo confirmación al paciente
    */
   private async enqueueConfirmationEmail(
     tx: any,
     appointmentId: string,
-    userId: string,
-    slot: any,
+    appointmentStatus: AppointmentStatus,
+    patientEmail: string,
+    patientFirstName: string,
+    patientLastName: string,
+    doctorFirstName: string,
+    doctorLastName: string,
+    specialtyName: string,
+    appointmentDate: Date,
     logContext: string,
   ): Promise<void> {
     try {
-      // Simulamos el encolado creando un registro en una tabla de emails
-      // En producción, usar Bull Queue o similar
-      this.logger.log(
-        `${logContext} Enqueuing confirmation email for appointment ${appointmentId}`,
-      );
+      if (appointmentStatus === AppointmentStatus.CONFIRMED) {
+        // Email de confirmación inmediata (paciente/admin creó la cita)
+        this.logger.log(
+          `${logContext} Enqueuing confirmation email for appointment ${appointmentId} (CONFIRMED)`,
+        );
 
-      // Aquí iría la lógica de encolado real
-      // await emailQueue.add('confirmation', { appointmentId, userId, slot });
+        await tx.emailMessage.create({
+          data: {
+            to: patientEmail,
+            subject: 'Cita confirmada',
+            template: 'BOOKING_CONFIRMATION',
+            status: 'PENDING',
+            variables: {
+              patientName: `${patientFirstName} ${patientLastName}`,
+              doctorName: `${doctorFirstName} ${doctorLastName}`,
+              specialty: specialtyName,
+              appointmentDate: appointmentDate.toISOString(),
+              confirmedAt: new Date().toISOString(),
+            },
+          },
+        });
+      } else if (appointmentStatus === AppointmentStatus.PENDING) {
+        // Email pidiendo confirmación (doctor creó la cita)
+        this.logger.log(
+          `${logContext} Enqueuing confirmation request email for appointment ${appointmentId} (PENDING)`,
+        );
+
+        await tx.emailMessage.create({
+          data: {
+            to: patientEmail,
+            subject: 'Confirma tu cita médica',
+            template: 'BOOKING_CONFIRMATION', // Podríamos crear un template específico para PENDING
+            status: 'PENDING',
+            variables: {
+              patientName: `${patientFirstName} ${patientLastName}`,
+              doctorName: `${doctorFirstName} ${doctorLastName}`,
+              specialty: specialtyName,
+              appointmentDate: appointmentDate.toISOString(),
+              requiresConfirmation: true,
+            },
+          },
+        });
+      }
     } catch (error) {
       this.logger.error(
         `${logContext} Failed to enqueue confirmation email: ${error.message}`,

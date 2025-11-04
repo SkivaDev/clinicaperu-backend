@@ -3,20 +3,20 @@ version: '3.8'
 services:
   # 🗄️ PostgreSQL - Base de datos principal
   db:
-    image: postgres:15-alpine
+    image: postgres:17
     container_name: clinicaperu-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: skivadev
       POSTGRES_PASSWORD: root
       POSTGRES_DB: clinica-peru-db
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-      LC_ALL: C.UTF-8
-      LANG: C.UTF-8
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command: ['postgres', '-c', 'client_encoding=UTF8']
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5435:5432"
+      - '5435:5432'
     networks:
       - clinicaperu-network
 
@@ -29,7 +29,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - '6379:6379'
     networks:
       - clinicaperu-network
 
@@ -39,8 +39,8 @@ services:
     container_name: clinicaperu-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025" # SMTP
-      - "8025:8025" # Interfaz web (http://localhost:8025)
+      - '1025:1025' # SMTP
+      - '8025:8025' # Interfaz web (http://localhost:8025)
     networks:
       - clinicaperu-network
 
@@ -52,7 +52,7 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
     ports:
-      - "8081:8081" # http://localhost:8081
+      - '8081:8081' # http://localhost:8081
     depends_on:
       - redis
     networks:
@@ -67,7 +67,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@local.dev
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "8082:80" # http://localhost:8082
+      - '8082:80' # http://localhost:8082
     depends_on:
       - db
     networks:
