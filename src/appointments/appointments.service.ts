@@ -40,10 +40,7 @@ export class AppointmentsService {
    * - DOCTOR: Solo las citas de sus pacientes
    * - ADMIN: Todas las citas del sistema
    */
-  async getMyAppointments(
-    userId: string,
-    userRole: Role,
-  ): Promise<any[]> {
+  async getMyAppointments(userId: string, userRole: Role): Promise<any[]> {
     let whereClause: any = {};
 
     if (userRole === Role.PATIENT) {
@@ -352,7 +349,9 @@ export class AppointmentsService {
         where: { id: appointmentId },
         include: {
           slot: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
           doctor: {
             include: {
               user: { select: { id: true, firstName: true, lastName: true } },
@@ -469,7 +468,9 @@ export class AppointmentsService {
         where: { id: appointmentId },
         include: {
           slot: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
           doctor: {
             include: {
               user: { select: { firstName: true, lastName: true } },
@@ -544,7 +545,9 @@ export class AppointmentsService {
       // 6. Validar que la fecha del nuevo slot sea futura
       const newSlotStart = new Date(newSlot.startAt);
       if (newSlotStart <= now) {
-        throw new BadRequestException('No se puede reservar slots en el pasado');
+        throw new BadRequestException(
+          'No se puede reservar slots en el pasado',
+        );
       }
 
       // 7. Obtener el schedule del nuevo slot para verificar el doctor
@@ -641,7 +644,9 @@ export class AppointmentsService {
         where: { id: appointmentId },
         include: {
           slot: true,
-          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
           doctor: {
             include: {
               user: { select: { id: true, firstName: true, lastName: true } },
@@ -700,6 +705,86 @@ export class AppointmentsService {
 
       this.logger.log(
         `Appointment ${appointmentId} confirmed successfully by user ${userId} (${userRole})`,
+      );
+
+      return updatedAppointment;
+    });
+  }
+
+  /**
+   * Marca una cita como atendida (ATTENDED)
+   * Solo el doctor asignado o un admin puede marcar asistencia
+   * Cambia el estado de CONFIRMED a ATTENDED y establece attendedAt
+   */
+  async markAsAttended(
+    appointmentId: string,
+    userId: string,
+    userRole: Role,
+  ): Promise<AppointmentResponseDto> {
+    this.logger.log(
+      `User ${userId} (${userRole}) attempting to mark appointment ${appointmentId} as attended`,
+    );
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Obtener la cita con todas las relaciones necesarias
+      const appointment = await tx.appointment.findUnique({
+        where: { id: appointmentId },
+        include: {
+          slot: true,
+          user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+          doctor: {
+            include: {
+              user: { select: { id: true, firstName: true, lastName: true } },
+              specialty: { select: { name: true } },
+            },
+          },
+        },
+      });
+
+      if (!appointment) {
+        throw new NotFoundException('Cita no encontrada');
+      }
+
+      // 2. Validar que la cita esté en estado CONFIRMED
+      if (appointment.status !== AppointmentStatus.CONFIRMED) {
+        throw new BadRequestException(
+          `No se puede marcar como atendida una cita con estado ${appointment.status}. Solo se pueden marcar citas CONFIRMED como atendidas.`,
+        );
+      }
+
+      // 3. Validar que la cita sea del día actual o pasada (no futura)
+      const now = new Date();
+      const appointmentStart = new Date(appointment.slot.startAt);
+
+      if (appointmentStart > now) {
+        throw new BadRequestException(
+          'No se puede marcar como atendida una cita futura. Solo citas del día actual o pasadas pueden marcarse como atendidas.',
+        );
+      }
+
+      // 4. Validar ownership: solo el doctor asignado o un admin puede marcar asistencia
+      const isDoctorOwner = appointment.doctor.userId === userId;
+      const isAdmin = userRole === Role.ADMIN;
+
+      if (!isDoctorOwner && !isAdmin) {
+        throw new ForbiddenException(
+          'Solo el doctor asignado puede marcar esta cita como atendida',
+        );
+      }
+
+      // 5. Actualizar el estado de la cita a ATTENDED
+      const updatedAppointment = await tx.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: AppointmentStatus.ATTENDED,
+          attendedAt: new Date(),
+        },
+      });
+
+      this.logger.log(
+        `Appointment ${appointmentId} marked as attended successfully by user ${userId} (${userRole})`,
       );
 
       return updatedAppointment;

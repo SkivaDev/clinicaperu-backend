@@ -274,6 +274,54 @@ export class AppointmentsController {
   }
 
   /**
+   * Marca una cita como atendida
+   * Solo el doctor asignado o un admin puede marcar asistencia
+   */
+  @Patch(':id/attend')
+  @Roles(Role.DOCTOR, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Marcar cita como atendida',
+    description:
+      'Marca una cita CONFIRMED como ATTENDED. Solo el doctor asignado puede marcar asistencia. Los admins también pueden marcar cualquier cita. Solo se puede marcar citas del día actual o pasadas.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID único de la cita a marcar como atendida',
+    example: 'uuid-here',
+  })
+  @ApiOkResponse({
+    description: 'Cita marcada como atendida exitosamente',
+    type: ResponseDto<AppointmentResponseDto>,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'La cita no está en estado CONFIRMED, es futura, o no se puede marcar como atendida',
+  })
+  @ApiForbiddenResponse({
+    description: 'Solo el doctor asignado puede marcar esta cita como atendida',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Cita no encontrada',
+  })
+  async markAsAttended(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<AppointmentResponseDto>> {
+    const appointment = await this.appointmentsService.markAsAttended(
+      id,
+      user.userId,
+      user.role,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Cita marcada como atendida exitosamente',
+      data: appointment,
+    };
+  }
+
+  /**
    * HU-026: DELETE /appointments/:id - Cancelar cita
    * Validación: solo si startAt > now + 24h (paciente)
    * Doctor y Admin pueden cancelar sin restricción de tiempo
