@@ -7,6 +7,7 @@ import { EmailService } from './email.service';
 import { EmailProcessor } from './email.processor';
 import { EmailController } from './email.controller';
 import { PrismaModule } from '../prisma/prisma.module';
+import { EmailProviderFactory } from './providers/email-provider.factory';
 
 @Module({
   imports: [
@@ -42,7 +43,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [EmailController],
-  providers: [EmailService, EmailProcessor],
+  providers: [EmailService, EmailProcessor, EmailProviderFactory],
   exports: [EmailService],
 })
 export class EmailModule {}

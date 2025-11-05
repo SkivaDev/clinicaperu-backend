@@ -14,6 +14,7 @@
         "calendar",
         "unavailability",
         "patients",
-        "security"
+        "security",
+        "email"
     ]
 }

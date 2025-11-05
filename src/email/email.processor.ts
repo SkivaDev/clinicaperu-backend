@@ -53,14 +53,9 @@ export class EmailProcessor extends WorkerHost {
       const html = this.emailService.renderTemplate(template, variables);
       const subject = this.emailService.getSubject(template);
 
-      // Send email using Nodemailer
-      const transporter = this.emailService.getTransporter();
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@clinicaperu.com',
-        to,
-        subject,
-        html,
-      });
+      // Send email using the configured provider
+      const emailProvider = this.emailService.getEmailProvider();
+      await emailProvider.sendEmail(to, subject, html);
 
       // Update database: SUCCESS
       await this.prisma.emailMessage.update({

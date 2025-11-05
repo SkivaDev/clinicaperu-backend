@@ -156,19 +156,11 @@ export class AppointmentsController {
     };
   }
 
-  //   @Get('calendar')
-  //   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
-  //   async getCalendarEvents(
-  //     @Query() query: CalendarQueryDto,
-  //   ): Promise<ResponseDto<CalendarEventDto[]>> {
-  //     const events = await this.appointmentsService.getCalendarEvents(query);
-
-  //     return {
-  //       statusCode: HttpStatus.OK,
-  //       message: 'Calendar events retrieved successfully',
-  //       data: events,
-  //     };
-  //   }
+  /**
+   * HU-025: Obtener cita por ID
+   * GET /appointments/:id
+   * Obtiene los detalles de una cita específica por su ID
+   */
   @Get(':id')
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
   @ApiOperation({
@@ -200,6 +192,11 @@ export class AppointmentsController {
     };
   }
 
+  /**
+   * Listar mis citas
+   * GET /appointments
+   * Obtiene las citas del usuario autenticado. Pacientes ven solo sus citas, doctores ven las citas de sus pacientes, admins ven todas.
+   */
   @Get()
   @Roles(Role.PATIENT, Role.DOCTOR, Role.ADMIN)
   @ApiOperation({

@@ -3,47 +3,43 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailTemplate, EmailStatus } from '@prisma/client';
-import * as nodemailer from 'nodemailer';
-import { Transporter } from 'nodemailer';
+import { EmailProviderFactory } from './providers/email-provider.factory';
+import { IEmailProvider, EmailProviderType } from './interfaces/email-provider.interface';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter;
+  private emailProvider: IEmailProvider;
 
   constructor(
     @InjectQueue('email') private emailQueue: Queue,
     private prisma: PrismaService,
+    private emailProviderFactory: EmailProviderFactory,
   ) {}
 
-  onModuleInit() {
-    // Validate environment variables
-    if (!process.env.SMTP_HOST || !process.env.SMTP_PORT) {
-      throw new Error(
-        'Missing required environment variables: SMTP_HOST, SMTP_PORT',
-      );
-    }
-
+  async onModuleInit() {
+    // Validate Redis environment variables (still needed for BullMQ)
     if (!process.env.REDIS_HOST || !process.env.REDIS_PORT) {
       throw new Error(
         'Missing required environment variables: REDIS_HOST, REDIS_PORT',
       );
     }
 
-    // Configure Nodemailer transporter
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
-      secure: false,
-      auth: process.env.SMTP_USER
-        ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          }
-        : undefined,
-    });
+    // Initialize email provider based on environment configuration
+    try {
+      this.emailProvider = this.emailProviderFactory.createProviderFromEnv();
 
-    this.logger.log('✅ Email service initialized with SMTP configuration');
+      // Perform health check
+      const isHealthy = await this.emailProvider.isHealthy();
+      if (!isHealthy) {
+        this.logger.warn(`⚠️ Email provider ${this.emailProvider.getProviderName()} health check failed`);
+      }
+
+      this.logger.log(`✅ Email service initialized with ${this.emailProvider.getProviderName()} provider`);
+    } catch (error) {
+      this.logger.error('❌ Failed to initialize email provider', error);
+      throw error;
+    }
   }
 
   /**
@@ -99,10 +95,17 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Get the transporter for sending emails
+   * Get the current email provider
    */
-  getTransporter(): Transporter {
-    return this.transporter;
+  getEmailProvider(): IEmailProvider {
+    return this.emailProvider;
+  }
+
+  /**
+   * Get the current email provider name
+   */
+  getProviderName(): EmailProviderType {
+    return this.emailProvider?.getProviderName() as EmailProviderType;
   }
 
   /**

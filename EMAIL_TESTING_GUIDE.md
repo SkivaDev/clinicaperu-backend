@@ -8,10 +8,17 @@
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# SMTP Configuration (MailHog)
+# Email Provider Configuration
+EMAIL_PROVIDER=mailhog  # or 'resend' for production
+
+# SMTP Configuration (MailHog - Development)
 SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_FROM=noreply@clinicaperu.com
+
+# Resend Configuration (Production)
+# RESEND_API_KEY=your-resend-api-key-here
+# RESEND_FROM_EMAIL=noreply@clinicaperu.com
 ```
 
 ### 2. Start Services
@@ -150,8 +157,23 @@ API → EmailService → Redis (BullMQ) → EmailProcessor → MailHog
 
 ## 🎯 Production Deployment
 
-For production, update `.env`:
+### Option 1: Using Resend (Recommended)
+First install the Resend package:
 ```bash
+pnpm add resend
+```
+
+Then update `.env`:
+```bash
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=your-actual-resend-api-key
+RESEND_FROM_EMAIL=noreply@clinicaperu.com
+```
+
+### Option 2: Using Traditional SMTP
+For production with traditional SMTP, update `.env`:
+```bash
+EMAIL_PROVIDER=mailhog
 SMTP_HOST=smtp.your-provider.com
 SMTP_PORT=587
 SMTP_USER=your-username
@@ -159,4 +181,11 @@ SMTP_PASS=your-password
 SMTP_FROM=noreply@clinicaperu.com
 ```
 
-All other code remains unchanged - production ready! ✅
+### Benefits of Resend:
+- ✅ Better deliverability
+- ✅ Built-in analytics and tracking
+- ✅ No SMTP server management
+- ✅ Automatic handling of bounces and complaints
+- ✅ RESTful API instead of SMTP
+
+All other code remains unchanged - production ready! 🚀
