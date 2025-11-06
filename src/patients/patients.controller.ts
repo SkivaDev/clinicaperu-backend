@@ -1,4 +1,14 @@
-import { Controller, Get, HttpStatus, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  HttpStatus,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -15,7 +25,13 @@ import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import type { CurrentUserPayload } from 'src/auth/types/current-user.interface';
 import { Role } from '@prisma/client';
 import { ResponseDto } from 'src/common/dto/response.dto';
-import { MyDoctorDto } from './dto/my-doctor.dto';
+import {
+  MyDoctorDto,
+  AdminPatientListDto,
+  AdminPatientDetailDto,
+  CreatePatientDto,
+  UpdatePatientDto,
+} from './dto';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -55,6 +71,174 @@ export class PatientsController {
       statusCode: HttpStatus.OK,
       message: `Found ${doctors.length} doctor(s)`,
       data: doctors,
+    };
+  }
+
+  /**
+   * ADMIN: GET /patients/admin/all
+   * Obtiene la lista de todos los pacientes con estadísticas
+   * Solo accesible para administradores
+   */
+  @Get('admin/all')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obtener todos los pacientes (Admin)',
+    description:
+      'Retorna la lista completa de pacientes con estadísticas de citas. Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Lista de pacientes obtenida exitosamente',
+    type: ResponseDto<AdminPatientListDto[]>,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async getAllPatients(): Promise<ResponseDto<AdminPatientListDto[]>> {
+    const patients = await this.patientsService.getAllPatients();
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: `Found ${patients.length} patient(s)`,
+      data: patients,
+    };
+  }
+
+  /**
+   * ADMIN: GET /patients/admin/:id
+   * Obtiene el detalle completo de un paciente
+   * Solo accesible para administradores
+   */
+  @Get('admin/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Obtener detalle de paciente (Admin)',
+    description:
+      'Retorna el detalle completo de un paciente incluyendo estadísticas y lista de citas. Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Detalle del paciente obtenido exitosamente',
+    type: ResponseDto<AdminPatientDetailDto>,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async getPatientById(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<AdminPatientDetailDto>> {
+    const patient = await this.patientsService.getPatientById(id);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Patient found successfully',
+      data: patient,
+    };
+  }
+
+  /**
+   * ADMIN: POST /patients/admin
+   * Crea un nuevo paciente
+   * Solo accesible para administradores
+   */
+  @Post('admin')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Crear nuevo paciente (Admin)',
+    description:
+      'Crea un nuevo paciente en el sistema. Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Paciente creado exitosamente',
+    type: ResponseDto<AdminPatientDetailDto>,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async createPatient(
+    @Body() dto: CreatePatientDto,
+  ): Promise<ResponseDto<AdminPatientDetailDto>> {
+    const patient = await this.patientsService.createPatient(dto);
+
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: 'Patient created successfully',
+      data: patient,
+    };
+  }
+
+  /**
+   * ADMIN: PUT /patients/admin/:id
+   * Actualiza un paciente existente
+   * Solo accesible para administradores
+   */
+  @Put('admin/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Actualizar paciente (Admin)',
+    description:
+      'Actualiza la información de un paciente existente. Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Paciente actualizado exitosamente',
+    type: ResponseDto<AdminPatientDetailDto>,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async updatePatient(
+    @Param('id') id: string,
+    @Body() dto: UpdatePatientDto,
+  ): Promise<ResponseDto<AdminPatientDetailDto>> {
+    const patient = await this.patientsService.updatePatient(id, dto);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Patient updated successfully',
+      data: patient,
+    };
+  }
+
+  /**
+   * ADMIN: DELETE /patients/admin/:id
+   * Desactiva un paciente
+   * Solo accesible para administradores
+   */
+  @Delete('admin/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Desactivar paciente (Admin)',
+    description:
+      'Desactiva un paciente en el sistema (soft delete). Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Paciente desactivado exitosamente',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'No autenticado',
+  })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async deletePatient(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<{ message: string }>> {
+    const result = await this.patientsService.deletePatient(id);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: result.message,
+      data: result,
     };
   }
 }
