@@ -528,8 +528,7 @@ async function main() {
       dayOfBirth: new Date('1985-07-22'),
       gender: 'FEMALE',
       role: 'DOCTOR',
-      profileImage:
-        'https://media.istockphoto.com/id/1372002650/photo/cropped-portrait-of-an-attractive-young-female-doctor-standing-with-her-arms-folded-in-the.jpg?s=612x612&w=0&k=20&c=o1QtStNsowOU0HSof6xQ_jZMglU8ZK565gHd655U6S4=',
+      profileImage: 'profile-images/default-doctors/doctor5.webp',
     },
   });
 
@@ -560,6 +559,7 @@ async function main() {
       dayOfBirth: new Date('1982-09-14'),
       gender: 'FEMALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor7.webp',
     },
   });
 
@@ -590,6 +590,7 @@ async function main() {
       dayOfBirth: new Date('1978-05-20'),
       gender: 'MALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor2.webp',
     },
   });
 
@@ -620,6 +621,7 @@ async function main() {
       dayOfBirth: new Date('1987-01-08'),
       gender: 'FEMALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor8.webp',
     },
   });
 
@@ -650,6 +652,7 @@ async function main() {
       dayOfBirth: new Date('1975-11-22'),
       gender: 'MALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor3.webp',
     },
   });
 
@@ -680,6 +683,7 @@ async function main() {
       dayOfBirth: new Date('1980-04-15'),
       gender: 'MALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor1.webp',
     },
   });
 
@@ -710,6 +714,7 @@ async function main() {
       dayOfBirth: new Date('1984-07-30'),
       gender: 'FEMALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor6.webp',
     },
   });
 
@@ -740,6 +745,7 @@ async function main() {
       dayOfBirth: new Date('1979-12-05'),
       gender: 'MALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor9.webp',
     },
   });
 
@@ -770,6 +776,7 @@ async function main() {
       dayOfBirth: new Date('1981-02-28'),
       gender: 'MALE',
       role: 'DOCTOR',
+      profileImage: 'profile-images/default-doctors/doctor10.webp',
     },
   });
 

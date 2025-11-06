@@ -15,5 +15,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
   async onModuleInit() {
     await this.$connect();
+    // Configurar encoding UTF-8 para PostgreSQL
+    await this.$executeRawUnsafe("SET client_encoding = 'UTF8'");
   }
 }
