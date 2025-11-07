@@ -77,6 +77,12 @@ enum PaymentMethod {
   CASH_AT_CLINIC
 }
 
+enum RecordType {
+  CONSULTATION
+  FOLLOW_UP
+  EMERGENCY
+}
+
 model User {
   id           String   @id @default(uuid())
   dni          String   @unique
@@ -99,6 +105,10 @@ model User {
 
   // Relación con citas y correos
   appointments Appointment[]
+
+  // Relación con expedientes médicos
+  createdMedicalRecords  MedicalRecord[]           @relation("CreatedMedicalRecords")
+  medicalRecordAccess    MedicalRecordAccessLog[]
 
   @@index([lastName])
   @@index([firstName, lastName])
@@ -245,6 +255,9 @@ model Appointment {
   
   // Relación 1:1 con Payment
   payment     Payment?
+  
+  // Relación 1:1 con MedicalRecord
+  medicalRecord MedicalRecord?
 
   @@index([doctorId, createdAt])
   @@index([userId, createdAt])
@@ -328,4 +341,49 @@ model PaymentAuditLog {
   createdAt   DateTime      @default(now())
   
   @@index([paymentId, createdAt])
+}
+
+model MedicalRecord {
+  id            String      @id @default(uuid())
+  appointmentId String      @unique
+  recordDate    DateTime    @default(now())
+  recordType    RecordType
+  
+  // Datos médicos (plaintext)
+  diagnosis     String      @db.Text
+  prescription  String?     @db.Text
+  notes         String?     @db.Text
+  vitalSigns    Json?       // {bloodPressure, heartRate, temperature, weight, height}
+  
+  // Archivos S3
+  attachments   Json[]      // [{key, name, uploadedAt, size}]
+  
+  // Relations
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  createdById   String
+  createdBy     User        @relation("CreatedMedicalRecords", fields: [createdById], references: [id], onDelete: Restrict)
+  
+  // Audit
+  accessLogs    MedicalRecordAccessLog[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@index([createdById, recordDate])
+  @@index([appointmentId])
+}
+
+model MedicalRecordAccessLog {
+  id        String        @id @default(uuid())
+  recordId  String
+  userId    String
+  action    String        // "CREATE", "VIEW", "DOWNLOAD_PDF", "UPLOAD_FILE"
+  metadata  Json?         // {fileName, fileSize, etc}
+  createdAt DateTime      @default(now())
+  
+  record    MedicalRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  
+  @@index([recordId, createdAt])
+  @@index([userId, createdAt])
 }

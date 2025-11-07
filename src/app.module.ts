@@ -19,6 +19,7 @@ import { UnavailabilityModule } from './unavailability/unavailability.module';
 import { PatientsModule } from './patients/patients.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PaymentsModule } from './payments/payments.module';
+import { MedicalRecordsModule } from './medical-records/medical-records.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PaymentsModule } from './payments/payments.module';
     PatientsModule,
     UploadsModule, // HU-028: Módulo para subir archivos a S3
     PaymentsModule, // HU-030: Módulo de pagos simulado
+    MedicalRecordsModule, // HU-031: Módulo de expedientes médicos
     AppointmentsModule,
     SchedulesModule,
     RoomsModule,
