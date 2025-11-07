@@ -15,6 +15,7 @@
         "unavailability",
         "patients",
         "security",
-        "email"
+        "email",
+        "s3"
     ]
 }

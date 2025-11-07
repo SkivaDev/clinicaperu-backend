@@ -116,12 +116,28 @@ export class UsersService {
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
 
-    // Mapear para convertir null a undefined
-    return users.map((user) => ({
-      ...user,
-      phone: user.phone ?? undefined,
-      profileImage: user.profileImage ?? undefined,
-    }));
+    // Mapear para convertir null a undefined y generar URLs de S3
+    return Promise.all(
+      users.map(async (user) => {
+        let profileImageUrl: string | undefined = undefined;
+        if (user.profileImage) {
+          try {
+            const url = await this.s3Service.generateDownloadUrl(
+              user.profileImage,
+              3600,
+            );
+            profileImageUrl = url ?? undefined;
+          } catch {
+            // Si falla, dejar como undefined
+          }
+        }
+        return {
+          ...user,
+          phone: user.phone ?? undefined,
+          profileImage: profileImageUrl,
+        };
+      }),
+    );
   }
 
   // findOne(id: number) {

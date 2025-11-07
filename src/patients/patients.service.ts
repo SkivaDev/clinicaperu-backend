@@ -14,6 +14,7 @@ import {
   PatientAppointmentDto,
 } from './dto';
 import { HashingService } from 'src/common/hashing/hashing.service';
+import { S3Service } from 'src/common/s3/s3.service';
 import { Role } from '@prisma/client';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class PatientsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly hashingService: HashingService,
+    private readonly s3Service: S3Service,
   ) {}
 
   /**
@@ -96,25 +98,32 @@ export class PatientsService {
       `Query completed in ${duration}ms. Found ${doctors.length} doctor(s)`,
     );
 
-    // Transformar resultado a DTO
-    const result: MyDoctorDto[] = doctors.map((doc) => ({
-      doctorId: doc.doctorId,
-      firstName: doc.firstName,
-      lastName: doc.lastName,
-      fullName: `${doc.firstName} ${doc.lastName}`,
-      profileImage: doc.profileImage,
-      cmp: doc.cmp,
-      rating: doc.rating,
-      yearsOfExperience: doc.yearsOfExperience,
-      consultationPrice: doc.consultationPrice,
-      specialty: doc.specialtyName,
-      clinic: doc.clinicName,
-      statistics: {
-        totalAppointments: Number(doc.totalAppointments),
-        attendedAppointments: Number(doc.attendedAppointments),
-        lastAppointmentDate: doc.lastAppointmentDate,
-      },
-    }));
+    // Transformar resultado a DTO con URLs de S3
+    const result: MyDoctorDto[] = await Promise.all(
+      doctors.map(async (doc) => {
+        const profileImageUrl = await this.generateProfileImageUrl(
+          doc.profileImage,
+        );
+        return {
+          doctorId: doc.doctorId,
+          firstName: doc.firstName,
+          lastName: doc.lastName,
+          fullName: `${doc.firstName} ${doc.lastName}`,
+          profileImage: profileImageUrl,
+          cmp: doc.cmp,
+          rating: doc.rating,
+          yearsOfExperience: doc.yearsOfExperience,
+          consultationPrice: doc.consultationPrice,
+          specialty: doc.specialtyName,
+          clinic: doc.clinicName,
+          statistics: {
+            totalAppointments: Number(doc.totalAppointments),
+            attendedAppointments: Number(doc.attendedAppointments),
+            lastAppointmentDate: doc.lastAppointmentDate,
+          },
+        };
+      }),
+    );
 
     return result;
   }
@@ -180,33 +189,38 @@ export class PatientsService {
       `Query completed in ${duration}ms. Found ${patients.length} patient(s)`,
     );
 
-    // Calcular edad y transformar a DTO
-    const result: AdminPatientListDto[] = patients.map((patient) => {
-      const age = this.calculateAge(patient.dayOfBirth);
-      return {
-        id: patient.id,
-        dni: patient.dni,
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-        fullName: `${patient.firstName} ${patient.lastName}`,
-        email: patient.email,
-        phone: patient.phone,
-        gender: patient.gender as any,
-        dayOfBirth: patient.dayOfBirth,
-        age,
-        profileImage: patient.profileImage,
-        role: patient.role as any,
-        isActive: patient.isActive,
-        createdAt: patient.createdAt,
-        statistics: {
-          totalAppointments: Number(patient.totalAppointments),
-          confirmedAppointments: Number(patient.confirmedAppointments),
-          attendedAppointments: Number(patient.attendedAppointments),
-          cancelledAppointments: Number(patient.cancelledAppointments),
-          lastAppointmentDate: patient.lastAppointmentDate,
-        },
-      };
-    });
+    // Calcular edad y transformar a DTO con URLs de S3
+    const result: AdminPatientListDto[] = await Promise.all(
+      patients.map(async (patient) => {
+        const age = this.calculateAge(patient.dayOfBirth);
+        const profileImageUrl = await this.generateProfileImageUrl(
+          patient.profileImage,
+        );
+        return {
+          id: patient.id,
+          dni: patient.dni,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          fullName: `${patient.firstName} ${patient.lastName}`,
+          email: patient.email,
+          phone: patient.phone,
+          gender: patient.gender as any,
+          dayOfBirth: patient.dayOfBirth,
+          age,
+          profileImage: profileImageUrl,
+          role: patient.role as any,
+          isActive: patient.isActive,
+          createdAt: patient.createdAt,
+          statistics: {
+            totalAppointments: Number(patient.totalAppointments),
+            confirmedAppointments: Number(patient.confirmedAppointments),
+            attendedAppointments: Number(patient.attendedAppointments),
+            cancelledAppointments: Number(patient.cancelledAppointments),
+            lastAppointmentDate: patient.lastAppointmentDate,
+          },
+        };
+      }),
+    );
 
     return result;
   }
@@ -285,6 +299,9 @@ export class PatientsService {
     );
 
     const age = this.calculateAge(patient.dayOfBirth);
+    const profileImageUrl = await this.generateProfileImageUrl(
+      patient.profileImage,
+    );
 
     return {
       id: patient.id,
@@ -296,7 +313,7 @@ export class PatientsService {
       gender: patient.gender,
       dayOfBirth: patient.dayOfBirth,
       age,
-      profileImage: patient.profileImage,
+      profileImage: profileImageUrl,
       role: patient.role,
       isActive: patient.isActive,
       createdAt: patient.createdAt,
@@ -439,6 +456,30 @@ export class PatientsService {
     this.logger.log(`Patient deactivated successfully: ${patientId}`);
 
     return { message: 'Patient deactivated successfully' };
+  }
+
+  /**
+   * Helper: Genera URL prefirmada de S3 para profileImage
+   * Si la imagen no existe o falla, retorna null
+   */
+  private async generateProfileImageUrl(
+    profileImage: string | null,
+  ): Promise<string | null> {
+    if (!profileImage) {
+      return null;
+    }
+
+    try {
+      // Generar URL prefirmada con expiración de 1 hora (3600 segundos)
+      const signedUrl = await this.s3Service.generateDownloadUrl(
+        profileImage,
+        3600,
+      );
+      return signedUrl;
+    } catch {
+      // Si falla, retornar null (la imagen no se mostrará)
+      return null;
+    }
   }
 
   /**

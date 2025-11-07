@@ -259,12 +259,23 @@ export class DoctorsService {
       include: { user: true, specialty: true },
     });
 
-    // Excluir passwordHash de cada usuario
-    return doctors.map((doctor) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...userWithoutPassword } = doctor.user;
-      return { ...doctor, user: userWithoutPassword };
-    });
+    // Excluir passwordHash de cada usuario y generar URLs de S3
+    return Promise.all(
+      doctors.map(async (doctor) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+        // Generar URL prefirmada de S3 para la imagen de perfil
+        const profileImageUrl = await this.generateProfileImageUrl(
+          userWithoutPassword.profileImage,
+        );
+
+        return {
+          ...doctor,
+          user: { ...userWithoutPassword, profileImage: profileImageUrl },
+        };
+      }),
+    );
   }
 
   async listDoctorsBySpecialty(specialtyId: string) {
@@ -273,12 +284,23 @@ export class DoctorsService {
       include: { user: true, clinic: true },
     });
 
-    // Excluir passwordHash de cada usuario
-    return doctors.map((doctor) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...userWithoutPassword } = doctor.user;
-      return { ...doctor, user: userWithoutPassword };
-    });
+    // Excluir passwordHash de cada usuario y generar URLs de S3
+    return Promise.all(
+      doctors.map(async (doctor) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+        // Generar URL prefirmada de S3 para la imagen de perfil
+        const profileImageUrl = await this.generateProfileImageUrl(
+          userWithoutPassword.profileImage,
+        );
+
+        return {
+          ...doctor,
+          user: { ...userWithoutPassword, profileImage: profileImageUrl },
+        };
+      }),
+    );
   }
 
   /**

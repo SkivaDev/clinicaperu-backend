@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { S3Service } from 'src/common/s3/s3.service';
 import { AppointmentResponseDto } from './dto/appointment-response.dto';
 import { AppointmentStatus, SlotStatus, Role } from '@prisma/client';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
@@ -20,7 +21,10 @@ import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   async getAppointmentById(id: string): Promise<AppointmentResponseDto> {
     const appointment = await this.prisma.appointment.findUnique({
@@ -111,7 +115,44 @@ export class AppointmentsService {
       },
     });
 
-    return appointments;
+    // Transformar profileImage del doctor a URL de S3
+    const appointmentsWithUrls = await Promise.all(
+      appointments.map(async (appointment) => {
+        if (appointment.doctor?.user?.profileImage) {
+          try {
+            const profileImageUrl = await this.s3Service.generateDownloadUrl(
+              appointment.doctor.user.profileImage,
+              3600,
+            );
+            return {
+              ...appointment,
+              doctor: {
+                ...appointment.doctor,
+                user: {
+                  ...appointment.doctor.user,
+                  profileImage: profileImageUrl,
+                },
+              },
+            };
+          } catch {
+            // Si falla, mantener el objeto sin URL
+            return {
+              ...appointment,
+              doctor: {
+                ...appointment.doctor,
+                user: {
+                  ...appointment.doctor.user,
+                  profileImage: null,
+                },
+              },
+            };
+          }
+        }
+        return appointment;
+      }),
+    );
+
+    return appointmentsWithUrls;
   }
 
   /**
