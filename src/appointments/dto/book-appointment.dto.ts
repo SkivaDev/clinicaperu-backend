@@ -1,6 +1,13 @@
 // src/appointments/dto/book-appointment.dto.ts
-import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  MaxLength,
+  IsEnum,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { PaymentMethod } from '@prisma/client';
 
 export class BookAppointmentDto {
   @ApiProperty({
@@ -31,4 +38,13 @@ export class BookAppointmentDto {
   @IsOptional()
   @MaxLength(1000)
   notes?: string;
+
+  @ApiProperty({
+    description: 'Método de pago para la cita',
+    enum: PaymentMethod,
+    example: 'SIMULATED_CARD',
+  })
+  @IsEnum(PaymentMethod)
+  @IsNotEmpty()
+  paymentMethod: PaymentMethod;
 }

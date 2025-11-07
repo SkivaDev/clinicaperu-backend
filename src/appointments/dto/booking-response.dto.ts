@@ -81,4 +81,24 @@ export class BookingResponseDto {
     id: string;
     name: string;
   };
+
+  // HU-030: Payment information
+  @ApiProperty({
+    description: 'ID del pago',
+    example: 'pagxxx123456789',
+    required: false,
+  })
+  paymentId?: string;
+
+  @ApiProperty({
+    description: 'Información del pago',
+    required: false,
+  })
+  payment?: {
+    amount: number;
+    currency: string;
+    status: string;
+    paymentMethod: string;
+    expiresAt?: Date;
+  };
 }

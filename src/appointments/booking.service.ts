@@ -108,11 +108,12 @@ export class BookingService {
     const initialStatus = AppointmentStatus.PENDING;
     const shouldSetConfirmedAt = false;
 
-    // Reutilizar la misma lógica de booking
+    // Construir DTO interno para reutilizar executeBookingTransaction
     const bookingDto: BookAppointmentDto = {
       slotId,
-      reason,
+      reason: reason || 'Reserva administrativa',
       notes,
+      paymentMethod: 'CASH_AT_CLINIC', // Default para bookings administrativos
     };
 
     let attempt = 0;
@@ -222,37 +223,52 @@ export class BookingService {
             throw new BadRequestException('Doctor not found');
           }
 
-          // 5. Crear la cita con el estado inicial apropiado
-          const appointmentData: any = {
-            userId: patientId,
-            doctorId: slot.doctorId,
-            slotId: bookingDto.slotId,
-            reason: bookingDto.reason,
-            notes: bookingDto.notes,
-            status: initialStatus,
-          };
-
-          // Si es CONFIRMED, establecer confirmedAt
-          if (
-            shouldSetConfirmedAt &&
-            initialStatus === AppointmentStatus.CONFIRMED
-          ) {
-            appointmentData.confirmedAt = new Date();
+          // 4.1 Validar que el doctor tenga precio de consulta configurado
+          if (!doctor.consultationPrice || doctor.consultationPrice <= 0) {
+            throw new BadRequestException(
+              'El doctor no tiene precio de consulta configurado. Contacta con la clínica.',
+            );
           }
 
+          // 5. Crear la cita en estado PENDING (HU-030: ahora requiere pago)
+          // HU-030: Siempre crear cita en PENDING inicialmente
           const appointment = await tx.appointment.create({
-            data: appointmentData,
-          });
-
-          // 6. Actualizar el slot a BOOKED
-          await tx.slot.update({
-            where: { id: bookingDto.slotId },
             data: {
-              status: SlotStatus.BOOKED,
+              userId: patientId,
+              doctorId: slot.doctorId,
+              slotId: bookingDto.slotId,
+              reason: bookingDto.reason,
+              notes: bookingDto.notes,
+              status: AppointmentStatus.PENDING,
             },
           });
 
-          // 7. Obtener información del paciente para el email
+          // 6. HU-030: Crear Payment con expiración de 15 minutos
+          const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+          const transactionId = `SIMTXN-${Date.now()}-${this.generateRandomString()}`;
+
+          const payment = await tx.payment.create({
+            data: {
+              appointmentId: appointment.id,
+              amount: doctor.consultationPrice,
+              currency: 'PEN',
+              status: 'PENDING',
+              paymentMethod: bookingDto.paymentMethod,
+              transactionId,
+              expiresAt,
+            },
+          });
+
+          // 7. HU-030: Actualizar slot a HELD (no BOOKED todavía)
+          await tx.slot.update({
+            where: { id: bookingDto.slotId },
+            data: {
+              status: SlotStatus.HELD,
+              holdExpiresAt: expiresAt,
+            },
+          });
+
+          // 8. Obtener información del paciente para el email
           const patient = await tx.user.findUnique({
             where: { id: patientId },
             select: {
@@ -262,11 +278,10 @@ export class BookingService {
             },
           });
 
-          // 8. Encolar email según el estado de la cita
-          await this.enqueueConfirmationEmail(
+          // 9. HU-030: Encolar email según método de pago
+          await this.enqueuePaymentEmail(
             tx,
-            appointment.id,
-            appointment.status,
+            bookingDto.paymentMethod,
             patient?.email || '',
             patient?.firstName || '',
             patient?.lastName || '',
@@ -274,10 +289,12 @@ export class BookingService {
             doctor.user.lastName,
             doctor.specialty.name,
             slot.startAt,
+            payment.amount,
+            expiresAt,
             logContext,
           );
 
-          // 9. Registrar en audit log
+          // 10. Registrar en audit log
           await this.logBookingAudit(
             tx,
             appointment.id,
@@ -291,7 +308,7 @@ export class BookingService {
             `${logContext} Transaction completed in ${duration}ms`,
           );
 
-          // Construir respuesta
+          // 11. HU-030: Construir respuesta con información de pago
           return {
             id: appointment.id,
             slotId: appointment.slotId,
@@ -311,6 +328,15 @@ export class BookingService {
             clinic: {
               id: doctor.clinic.id,
               name: doctor.clinic.name,
+            },
+            // HU-030: Información de pago
+            paymentId: payment.id,
+            payment: {
+              amount: Number(payment.amount),
+              currency: payment.currency,
+              status: payment.status,
+              paymentMethod: payment.paymentMethod,
+              expiresAt: payment.expiresAt || undefined,
             },
           };
         },
@@ -522,5 +548,85 @@ export class BookingService {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * HU-030: Encola email según método de pago
+   */
+  private async enqueuePaymentEmail(
+    tx: any,
+    paymentMethod: string,
+    patientEmail: string,
+    patientFirstName: string,
+    patientLastName: string,
+    doctorFirstName: string,
+    doctorLastName: string,
+    specialtyName: string,
+    appointmentDate: Date,
+    amount: any,
+    expiresAt: Date,
+    logContext: string,
+  ): Promise<void> {
+    try {
+      if (paymentMethod === 'CASH_AT_CLINIC') {
+        this.logger.log(
+          `${logContext} Enqueuing cash payment email for ${patientEmail}`,
+        );
+
+        await tx.emailMessage.create({
+          data: {
+            to: patientEmail,
+            subject: 'Cita reservada - Pagar en recepción',
+            template: 'BOOKING_CONFIRMATION',
+            status: 'PENDING',
+            variables: {
+              patientName: `${patientFirstName} ${patientLastName}`,
+              doctorName: `${doctorFirstName} ${doctorLastName}`,
+              specialty: specialtyName,
+              appointmentDate: appointmentDate.toISOString(),
+              paymentMethod: 'Efectivo en clínica',
+              amount: amount.toString(),
+              message:
+                'Por favor, realiza el pago en recepción antes de tu consulta.',
+            },
+          },
+        });
+      } else {
+        this.logger.log(
+          `${logContext} Enqueuing card payment email for ${patientEmail}`,
+        );
+
+        await tx.emailMessage.create({
+          data: {
+            to: patientEmail,
+            subject: 'Completa tu pago - Cita reservada temporalmente',
+            template: 'BOOKING_CONFIRMATION',
+            status: 'PENDING',
+            variables: {
+              patientName: `${patientFirstName} ${patientLastName}`,
+              doctorName: `${doctorFirstName} ${doctorLastName}`,
+              specialty: specialtyName,
+              appointmentDate: appointmentDate.toISOString(),
+              paymentMethod: 'Tarjeta',
+              amount: amount.toString(),
+              expiresAt: expiresAt.toISOString(),
+              message:
+                'Tienes 15 minutos para completar el pago y confirmar tu cita.',
+            },
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        `${logContext} Failed to enqueue payment email: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * HU-030: Genera una cadena aleatoria para el transactionId
+   */
+  private generateRandomString(): string {
+    return Math.random().toString(36).substr(2, 9).toUpperCase();
   }
 }

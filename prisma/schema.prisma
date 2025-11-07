@@ -63,6 +63,20 @@ enum EmailTemplate {
   WELCOME
 }
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  SIMULATED_CARD
+  CASH_AT_CLINIC
+}
+
 model User {
   id           String   @id @default(uuid())
   dni          String   @unique
@@ -218,6 +232,8 @@ model Appointment {
   updatedAt   DateTime          @updatedAt
   confirmedAt DateTime?
   cancelledAt DateTime?
+  cancelledBy String?           // userId de quien canceló
+  cancellationReason String?   // Razón de cancelación
   attendedAt  DateTime?
 
   userId      String            // paciente
@@ -226,6 +242,9 @@ model Appointment {
   doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   slotId      String            @unique // Cada cita corresponde a un único slot (1:1)
   slot    Slot   @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  
+  // Relación 1:1 con Payment
+  payment     Payment?
 
   @@index([doctorId, createdAt])
   @@index([userId, createdAt])
@@ -259,4 +278,54 @@ model EmailMessage {
 
   @@index([status, createdAt])
   @@index([to])
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  appointmentId    String        @unique
+  appointment      Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  
+  // Datos financieros
+  amount           Decimal       @db.Decimal(10, 2)
+  currency         String        @default("PEN")
+  status           PaymentStatus @default(PENDING)
+  paymentMethod    PaymentMethod
+  
+  // Identificación de transacción
+  transactionId    String        @unique
+  
+  // Timestamps
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  paidAt           DateTime?
+  refundedAt       DateTime?
+  expiresAt        DateTime?
+  
+  // Datos de procesamiento
+  processingTimeMs Int?
+  retryCount       Int           @default(0)
+  failureReason    String?
+  
+  // Metadatos seguros (NO datos sensibles)
+  metadata         Json?
+  gatewayResponse  Json?
+  
+  // Refund
+  refundReason     String?
+  refundAmount     Decimal?      @db.Decimal(10, 2)
+  
+  @@index([status, createdAt])
+  @@index([transactionId])
+  @@index([appointmentId])
+}
+
+model PaymentAuditLog {
+  id          String        @id @default(uuid())
+  paymentId   String
+  action      String
+  status      PaymentStatus
+  metadata    Json
+  createdAt   DateTime      @default(now())
+  
+  @@index([paymentId, createdAt])
 }
