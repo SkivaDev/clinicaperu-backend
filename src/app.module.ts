@@ -20,6 +20,7 @@ import { PatientsModule } from './patients/patients.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PaymentsModule } from './payments/payments.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
+import { AvailabilityModule } from './availability/availability.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { MedicalRecordsModule } from './medical-records/medical-records.module';
     CalendarModule,
     EmailModule,
     UnavailabilityModule,
+    AvailabilityModule, // HU-022: Módulo de disponibilidad pública optimizado
   ],
   providers: [
     // Aplicar ThrottlerGuard globalmente a todos los endpoints
