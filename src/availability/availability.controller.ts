@@ -24,8 +24,18 @@ export class AvailabilityController {
   constructor(private readonly availabilityService: AvailabilityService) {}
 
   /**
-   * Dashboard de disponibilidad para pacientes
-   * Retorna especialidades con stats, doctores con próximos slots y estadísticas globales
+   * Dashboard de disponibilidad para pacientes (Modo Inteligente)
+   *
+   * Modo Dashboard General (sin doctorId):
+   * - Retorna especialidades con stats
+   * - Doctores disponibles con próximos 5 slots
+   * - Estadísticas globales
+   *
+   * Modo Calendario (con doctorId):
+   * - Retorna doctor específico
+   * - TODOS los slots disponibles en el rango
+   * - Navegación por día/semana/mes
+   *
    * Optimizado con queries paralelas y cache de 1 minuto
    */
   @Public()
@@ -56,8 +66,24 @@ export class AvailabilityController {
       'Fecha de inicio para buscar disponibilidad (ISO 8601). Por defecto: hoy',
     example: '2024-11-15T00:00:00.000Z',
   })
+  @ApiQuery({
+    name: 'doctorId',
+    required: false,
+    description:
+      'ID del doctor (activa modo calendario con TODOS los slots del rango)',
+    example: 'doctor-uuid',
+  })
+  @ApiQuery({
+    name: 'view',
+    required: false,
+    description:
+      'Vista del calendario (solo aplica con doctorId): DAY, WEEK, MONTH',
+    example: 'WEEK',
+  })
   @ApiOkResponse({
-    description: 'Dashboard de disponibilidad obtenido exitosamente',
+    description:
+      'Dashboard de disponibilidad obtenido exitosamente. ' +
+      'Respuesta varía según modo: general (specialties, doctors, stats) o calendario (doctor, slots, dateRange)',
     type: AvailabilityDashboardDto,
   })
   async getDashboard(

@@ -100,12 +100,32 @@ export class AvailabilityStatsDto {
 }
 
 export class AvailabilityDashboardDto {
-  @ApiProperty({ type: [SpecialtyWithStatsDto] })
-  specialties: SpecialtyWithStatsDto[];
+  // Campos para modo dashboard general
+  @ApiProperty({ type: [SpecialtyWithStatsDto], required: false })
+  specialties?: SpecialtyWithStatsDto[];
 
-  @ApiProperty({ type: [DoctorWithSlotsDto] })
-  doctors: DoctorWithSlotsDto[];
+  @ApiProperty({ type: [DoctorWithSlotsDto], required: false })
+  doctors?: DoctorWithSlotsDto[];
 
-  @ApiProperty({ type: AvailabilityStatsDto })
-  stats: AvailabilityStatsDto;
+  @ApiProperty({ type: AvailabilityStatsDto, required: false })
+  stats?: AvailabilityStatsDto;
+
+  // Campos para modo calendario (cuando hay doctorId)
+  @ApiProperty({ type: DoctorWithSlotsDto, required: false })
+  doctor?: DoctorWithSlotsDto;
+
+  @ApiProperty({ type: [NextAvailableSlotDto], required: false })
+  slots?: NextAvailableSlotDto[];
+
+  @ApiProperty({
+    required: false,
+    example: {
+      start: '2024-11-15T00:00:00.000Z',
+      end: '2024-11-22T00:00:00.000Z',
+    },
+  })
+  dateRange?: {
+    start: string;
+    end: string;
+  };
 }

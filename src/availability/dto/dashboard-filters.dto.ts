@@ -1,5 +1,11 @@
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+
+export enum CalendarViewEnum {
+  DAY = 'DAY',
+  WEEK = 'WEEK',
+  MONTH = 'MONTH',
+}
 
 export class DashboardFiltersDto {
   @ApiPropertyOptional({
@@ -25,4 +31,21 @@ export class DashboardFiltersDto {
   @IsOptional()
   @IsDateString()
   startDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID del doctor (activa modo calendario con todos los slots)',
+    example: 'doctor-uuid',
+  })
+  @IsOptional()
+  @IsString()
+  doctorId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Vista del calendario (solo aplica con doctorId)',
+    enum: CalendarViewEnum,
+    example: CalendarViewEnum.WEEK,
+  })
+  @IsOptional()
+  @IsEnum(CalendarViewEnum)
+  view?: CalendarViewEnum;
 }

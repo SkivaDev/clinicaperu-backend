@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotStatus } from '@prisma/client';
@@ -8,7 +7,10 @@ import {
   SpecialtyWithStatsDto,
   NextAvailableSlotDto,
 } from './dto/availability-dashboard.dto';
-import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
+import {
+  DashboardFiltersDto,
+  CalendarViewEnum,
+} from './dto/dashboard-filters.dto';
 
 @Injectable()
 export class AvailabilityService {
@@ -16,9 +18,26 @@ export class AvailabilityService {
 
   /**
    * Obtiene el dashboard de disponibilidad optimizado para pacientes
-   * Incluye especialidades con stats, doctores con próximos slots y estadísticas globales
+   * Modo inteligente:
+   * - Con doctorId: Retorna calendario completo del doctor con todos los slots
+   * - Sin doctorId: Retorna dashboard general con especialidades y doctores
    */
   async getDashboard(
+    filters: DashboardFiltersDto,
+  ): Promise<AvailabilityDashboardDto> {
+    // ✅ Modo calendario: Si hay doctorId, retornar todos los slots del doctor
+    if (filters.doctorId) {
+      return this.getDoctorCalendarMode(filters);
+    }
+
+    // ✅ Modo dashboard general: Sin doctorId, retornar vista general
+    return this.getGeneralDashboardMode(filters);
+  }
+
+  /**
+   * Modo dashboard general: Especialidades + Doctores + Stats
+   */
+  private async getGeneralDashboardMode(
     filters: DashboardFiltersDto,
   ): Promise<AvailabilityDashboardDto> {
     const startDate = filters.startDate
@@ -51,6 +70,131 @@ export class AvailabilityService {
         },
       },
     };
+  }
+
+  /**
+   * Modo calendario: Retorna doctor específico con TODOS sus slots en el rango
+   */
+  private async getDoctorCalendarMode(
+    filters: DashboardFiltersDto,
+  ): Promise<AvailabilityDashboardDto> {
+    const startDate = filters.startDate
+      ? new Date(filters.startDate)
+      : new Date();
+
+    // Calcular rango basado en la vista
+    const dateRange = this.calculateDateRangeByView(
+      startDate,
+      filters.view || CalendarViewEnum.WEEK,
+    );
+
+    // Obtener doctor con todos sus slots en el rango
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: filters.doctorId, isActive: true },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            profileImage: true,
+          },
+        },
+        specialty: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        clinic: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        schedules: {
+          where: { isActive: true },
+          include: {
+            slots: {
+              where: {
+                status: SlotStatus.FREE,
+                startAt: { gte: dateRange.start, lte: dateRange.end },
+              },
+              orderBy: { startAt: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!doctor) {
+      throw new Error(`Doctor with ID ${filters.doctorId} not found`);
+    }
+
+    // Extraer todos los slots y ordenarlos
+    const allSlots = doctor.schedules
+      .flatMap((schedule) => schedule.slots)
+      .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+    const slots: NextAvailableSlotDto[] = allSlots.map((slot) => ({
+      id: slot.id,
+      startAt: slot.startAt.toISOString(),
+      endAt: slot.endAt.toISOString(),
+    }));
+
+    return {
+      doctor: {
+        id: doctor.id,
+        cmp: doctor.cmp,
+        consultationPrice: doctor.consultationPrice,
+        rating: doctor.rating,
+        user: {
+          firstName: doctor.user.firstName,
+          lastName: doctor.user.lastName,
+          profileImage: doctor.user.profileImage,
+        },
+        specialty: {
+          id: doctor.specialty.id,
+          name: doctor.specialty.name,
+        },
+        clinic: {
+          id: doctor.clinic.id,
+          name: doctor.clinic.name,
+        },
+        nextAvailableSlots: slots.slice(0, 5), // Primeros 5 para preview
+      },
+      slots, // TODOS los slots para el calendario
+      dateRange: {
+        start: dateRange.start.toISOString(),
+        end: dateRange.end.toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Calcula el rango de fechas basado en la vista del calendario
+   */
+  private calculateDateRangeByView(
+    startDate: Date,
+    view: CalendarViewEnum,
+  ): { start: Date; end: Date } {
+    const start = new Date(startDate);
+    const end = new Date(startDate);
+
+    switch (view) {
+      case CalendarViewEnum.DAY:
+        end.setDate(end.getDate() + 1);
+        break;
+      case CalendarViewEnum.WEEK:
+        end.setDate(end.getDate() + 7);
+        break;
+      case CalendarViewEnum.MONTH:
+        end.setMonth(end.getMonth() + 1);
+        break;
+      default:
+        end.setDate(end.getDate() + 7); // Default: semana
+    }
+
+    return { start, end };
   }
 
   /**
