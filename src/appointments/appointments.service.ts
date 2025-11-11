@@ -115,42 +115,55 @@ export class AppointmentsService {
       },
     });
 
-    // Transformar profileImage del doctor a URL de S3
-    const appointmentsWithUrls = await Promise.all(
-      appointments.map(async (appointment) => {
-        if (appointment.doctor?.user?.profileImage) {
-          try {
-            const profileImageUrl = await this.s3Service.generateDownloadUrl(
-              appointment.doctor.user.profileImage,
-              3600,
-            );
-            return {
-              ...appointment,
-              doctor: {
-                ...appointment.doctor,
-                user: {
-                  ...appointment.doctor.user,
-                  profileImage: profileImageUrl,
-                },
-              },
-            };
-          } catch {
-            // Si falla, mantener el objeto sin URL
-            return {
-              ...appointment,
-              doctor: {
-                ...appointment.doctor,
-                user: {
-                  ...appointment.doctor.user,
-                  profileImage: null,
-                },
-              },
-            };
-          }
-        }
-        return appointment;
-      }),
-    );
+    // Ya no por CloudFront: Transformar profileImage del doctor a URL de S3
+    // const appointmentsWithUrls = await Promise.all(
+    //   appointments.map(async (appointment) => {
+    //     if (appointment.doctor?.user?.profileImage) {
+    //       try {
+    //         const profileImageUrl = await this.s3Service.generateDownloadUrl(
+    //           appointment.doctor.user.profileImage,
+    //           3600,
+    //         );
+    //         return {
+    //           ...appointment,
+    //           doctor: {
+    //             ...appointment.doctor,
+    //             user: {
+    //               ...appointment.doctor.user,
+    //               profileImage: profileImageUrl,
+    //             },
+    //           },
+    //         };
+    //       } catch {
+    //         // Si falla, mantener el objeto sin URL
+    //         return {
+    //           ...appointment,
+    //           doctor: {
+    //             ...appointment.doctor,
+    //             user: {
+    //               ...appointment.doctor.user,
+    //               profileImage: null,
+    //             },
+    //           },
+    //         };
+    //       }
+    //     }
+    //     return appointment;
+    //   }),
+    // );
+
+    // Devolver las citas sin modificar la URL de profileImage
+    const appointmentsWithUrls = appointments.map((appointment) => ({
+      ...appointment,
+      doctor: {
+        ...appointment.doctor,
+        user: {
+          ...appointment.doctor.user,
+          // Mantener la imagen tal como está
+          profileImage: appointment.doctor?.user?.profileImage || null,
+        },
+      },
+    }));
 
     return appointmentsWithUrls;
   }

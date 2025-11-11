@@ -98,32 +98,25 @@ export class PatientsService {
       `Query completed in ${duration}ms. Found ${doctors.length} doctor(s)`,
     );
 
-    // Transformar resultado a DTO con URLs de S3
-    const result: MyDoctorDto[] = await Promise.all(
-      doctors.map(async (doc) => {
-        const profileImageUrl = await this.generateProfileImageUrl(
-          doc.profileImage,
-        );
-        return {
-          doctorId: doc.doctorId,
-          firstName: doc.firstName,
-          lastName: doc.lastName,
-          fullName: `${doc.firstName} ${doc.lastName}`,
-          profileImage: profileImageUrl,
-          cmp: doc.cmp,
-          rating: doc.rating,
-          yearsOfExperience: doc.yearsOfExperience,
-          consultationPrice: doc.consultationPrice,
-          specialty: doc.specialtyName,
-          clinic: doc.clinicName,
-          statistics: {
-            totalAppointments: Number(doc.totalAppointments),
-            attendedAppointments: Number(doc.attendedAppointments),
-            lastAppointmentDate: doc.lastAppointmentDate,
-          },
-        };
-      }),
-    );
+    // Transformar resultado a DTO sin modificar la URL de profileImage
+    const result: MyDoctorDto[] = doctors.map((doc) => ({
+      doctorId: doc.doctorId,
+      firstName: doc.firstName,
+      lastName: doc.lastName,
+      fullName: `${doc.firstName} ${doc.lastName}`,
+      profileImage: doc.profileImage,
+      cmp: doc.cmp,
+      rating: doc.rating,
+      yearsOfExperience: doc.yearsOfExperience,
+      consultationPrice: doc.consultationPrice,
+      specialty: doc.specialtyName,
+      clinic: doc.clinicName,
+      statistics: {
+        totalAppointments: Number(doc.totalAppointments),
+        attendedAppointments: Number(doc.attendedAppointments),
+        lastAppointmentDate: doc.lastAppointmentDate,
+      },
+    }));
 
     return result;
   }
@@ -258,9 +251,7 @@ export class PatientsService {
     }
 
     if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(
-        `User with ID ${patientId} is not a patient`,
-      );
+      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
     }
 
     // Calcular estadísticas
@@ -390,9 +381,7 @@ export class PatientsService {
     }
 
     if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(
-        `User with ID ${patientId} is not a patient`,
-      );
+      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
     }
 
     // Verificar email único si se está cambiando
@@ -442,9 +431,7 @@ export class PatientsService {
     }
 
     if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(
-        `User with ID ${patientId} is not a patient`,
-      );
+      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
     }
 
     // Desactivar en lugar de eliminar (soft delete)

@@ -400,13 +400,9 @@ export class DoctorsService {
       this.prisma.doctor.count({ where }),
     ]);
 
-    // Generar URLs prefirmadas de S3 para las imágenes de perfil
+    // Generar estructura segura para la respuesta doctores publicos
     const data: PublicDoctorListDto[] = await Promise.all(
       doctors.map(async (doctor) => {
-        const profileImageUrl = await this.generateProfileImageUrl(
-          doctor.user.profileImage,
-        );
-
         return {
           id: doctor.id,
           cmp: doctor.cmp,
@@ -418,7 +414,7 @@ export class DoctorsService {
             id: doctor.user.id,
             firstName: doctor.user.firstName,
             lastName: doctor.user.lastName,
-            profileImage: profileImageUrl,
+            profileImage: doctor.user.profileImage,
             email: doctor.user.email,
             phone: doctor.user.phone || null,
           },

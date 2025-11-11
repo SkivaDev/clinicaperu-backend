@@ -36,8 +36,7 @@ async function main() {
       dayOfBirth: new Date('2000-05-10'),
       gender: 'MALE',
       role: 'PATIENT',
-      profileImage:
-        'profile-images/559108b2-ca0b-4b1f-a565-6ebd8e4fac77/27955300-5484-4703-9036-159ce1135977-hgost.jpg',
+      profileImage: 'profile-images/default-patients/patientUno.webp',
     },
   });
 
@@ -166,13 +165,13 @@ async function main() {
   });
 
   // ========== ESPECIALIDADES ==========
-  const cardiologia = await prisma.specialty.upsert({
-    where: { name: 'Cardiología' },
+  const medicinaGeneral = await prisma.specialty.upsert({
+    where: { name: 'Medicina General' },
     update: {},
     create: {
-      name: 'Cardiología',
+      name: 'Medicina General',
       description:
-        'Especialidad médica que se encarga de la prevención, diagnóstico y tratamiento de enfermedades del corazón y vasos sanguíneos.',
+        'Especialidad médica que se enfoca en la atención integral del paciente, abarcando la prevención, diagnóstico y tratamiento de enfermedades comunes, así como la promoción de la salud en todas las etapas de la vida.',
     },
   });
 
@@ -496,8 +495,7 @@ async function main() {
       dayOfBirth: new Date('1980-03-12'),
       gender: 'MALE',
       role: 'DOCTOR',
-      profileImage:
-        'profile-images/7e1914c9-958e-4702-93d9-3e4e1292d4e8/9da7c04f-6c12-4162-ba94-43ac2ccd334c-avatar-doctor.webp',
+      profileImage: 'profile-images/default-doctors/doctortv.webp',
     },
   });
 
@@ -508,7 +506,7 @@ async function main() {
       cmp: 12345,
       userId: doctor1User.id,
       clinicId: clinic.id,
-      specialtyId: cardiologia.id,
+      specialtyId: medicinaGeneral.id,
       yearsOfExperience: 15,
       consultationPrice: 150.0,
       rating: 3.5,

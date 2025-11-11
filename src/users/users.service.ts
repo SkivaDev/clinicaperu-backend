@@ -176,28 +176,28 @@ export class UsersService {
     }
 
     // Generar URL prefirmada para la imagen de perfil si existe
-    let profileImageUrl: string | null = null;
-    if (user.profileImage) {
-      try {
-        profileImageUrl = await this.s3Service.generateDownloadUrl(
-          user.profileImage,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Failed to generate profile image URL for user ${userId}: ${error.message}`,
-        );
-        // No lanzar error, solo continuar sin imagen
-      }
-    }
+    // let profileImageUrl: string | null = null;
+    // if (user.profileImage) {
+    //   try {
+    //     profileImageUrl = await this.s3Service.generateDownloadUrl(
+    //       user.profileImage,
+    //     );
+    //   } catch (error) {
+    //     this.logger.warn(
+    //       `Failed to generate profile image URL for user ${userId}: ${error.message}`,
+    //     );
+    //     // No lanzar error, solo continuar sin imagen
+    //   }
+    // }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, profileImage, ...userWithoutPassword } = user;
+    const { passwordHash, ...userWithoutPassword } = user;
 
     // Si es doctor, retornar con información adicional
     if (user.role === Role.DOCTOR && user.doctor) {
       const doctorProfile: DoctorProfileDto = {
         ...userWithoutPassword,
-        profileImage: profileImageUrl,
+        profileImage: user.profileImage,
         doctorInfo: {
           id: user.doctor.id,
           cmp: user.doctor.cmp,
@@ -214,7 +214,7 @@ export class UsersService {
     // Si es paciente, retornar perfil básico
     const patientProfile: PatientProfileDto = {
       ...userWithoutPassword,
-      profileImage: profileImageUrl,
+      profileImage: user.profileImage,
     };
 
     return patientProfile;
