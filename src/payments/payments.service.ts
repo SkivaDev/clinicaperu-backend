@@ -122,7 +122,7 @@ export class PaymentsService {
       data: payments.map((payment) => ({
         id: payment.id,
         transactionId: payment.transactionId,
-        amount: payment.amount,
+        amount: payment.amount.toNumber(),
         currency: payment.currency,
         status: payment.status,
         paymentMethod: payment.paymentMethod,
@@ -142,10 +142,18 @@ export class PaymentsService {
         },
         metadata: payment.metadata,
       })),
-      pagination: {
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
+      // pagination: {
+      //   total,
+      //   page,
+      //   totalPages: Math.ceil(total / limit),
+      // },
+      meta: {
+        totalCount: total,
+        pageCount: Math.ceil(total / limit),
+        currentPage: page,
+        perPage: limit,
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1,
       },
     };
   }

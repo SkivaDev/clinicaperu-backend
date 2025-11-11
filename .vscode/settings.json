@@ -17,6 +17,7 @@
         "security",
         "email",
         "s3",
-        "availability"
+        "availability",
+        "payments"
     ]
 }

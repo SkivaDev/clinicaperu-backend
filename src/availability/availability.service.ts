@@ -141,6 +141,12 @@ export class AvailabilityService {
       endAt: slot.endAt.toISOString(),
     }));
 
+    // Calcular estadísticas
+    const totalAvailableSlots = allSlots.filter(
+      (slot) => slot.status === SlotStatus.FREE,
+    ).length;
+    const availableDoctors = 1;
+
     return {
       doctor: {
         id: doctor.id,
@@ -163,9 +169,13 @@ export class AvailabilityService {
         nextAvailableSlots: slots.slice(0, 5), // Primeros 5 para preview
       },
       slots, // TODOS los slots para el calendario
-      dateRange: {
-        start: dateRange.start.toISOString(),
-        end: dateRange.end.toISOString(),
+      stats: {
+        totalAvailableSlots,
+        availableDoctors,
+        dateRange: {
+          start: dateRange.start.toISOString(),
+          end: dateRange.end.toISOString(),
+        },
       },
     };
   }

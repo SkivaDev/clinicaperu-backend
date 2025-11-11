@@ -22,6 +22,7 @@ import { ProcessPaymentDto } from './dto/process-payment.dto';
 import { MarkCashPaidDto } from './dto/mark-cash-paid.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { PaymentHistoryQueryDto } from './dto/payment-history-query.dto';
+import { PaymentHistoryItemDto } from './dto/payment-history-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -134,7 +135,7 @@ export class PaymentsController {
   async getPaymentHistory(
     @Query() query: PaymentHistoryQueryDto,
     @CurrentUser() user: any,
-  ): Promise<ResponseDto<any>> {
+  ): Promise<ResponseDto<PaymentHistoryItemDto[]>> {
     const result = await this.paymentsService.getPaymentHistory(
       user.userId,
       query,
@@ -144,7 +145,7 @@ export class PaymentsController {
       statusCode: HttpStatus.OK,
       message: 'Historial de pagos obtenido',
       data: result.data,
-      pagination: result.pagination,
+      meta: result.meta,
     };
   }
 

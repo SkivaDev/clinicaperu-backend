@@ -8,4 +8,12 @@ export class ResponseDto<T> {
     page: number;
     totalPages: number;
   };
+  meta?: {
+    totalCount: number;
+    pageCount: number;
+    currentPage: number;
+    perPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
 }

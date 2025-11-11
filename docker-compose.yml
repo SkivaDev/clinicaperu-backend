@@ -10,9 +10,9 @@ services:
       POSTGRES_USER: skivadev
       POSTGRES_PASSWORD: root
       POSTGRES_DB: clinica-peru-db
-      LANG: en_US.UTF-8
-      LC_ALL: en_US.UTF-8
-    command: ['postgres', '-c', 'client_encoding=UTF8']
+      LANG: en_US.UTF-8           # ✅ Fuerza UTF-8 en el sistema
+      LC_ALL: en_US.UTF-8         # ✅ Fuerza UTF-8 en locale
+    command: ['postgres', '-c', 'client_encoding=UTF8']  # ✅ Fuerza UTF-8 en conexiones
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
