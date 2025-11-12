@@ -1605,6 +1605,343 @@ async function main() {
   console.log('✅ Múltiples citas creadas con diferentes estados');
   console.log('✅ Indisponibilidades de doctores registradas');
   console.log('✅ Mensajes de email generados');
+
+  // ====================== MEDICAL RECORDS ======================
+  // Obtener citas ATTENDED para crear expedientes médicos
+  const attendedAppointments = await prisma.appointment.findMany({
+    where: { status: 'ATTENDED' },
+    include: {
+      doctor: {
+        include: {
+          user: true,
+        },
+      },
+      user: true,
+    },
+  });
+
+  console.log(
+    `📋 Creando expedientes médicos para ${attendedAppointments.length} citas atendidas...`,
+  );
+
+  // Medical Record 1: Consulta ginecológica (Patient3 - Doctor3)
+  if (attendedAppointments[0]) {
+    const record1 = await prisma.medicalRecord.create({
+      data: {
+        appointmentId: attendedAppointments[0].id,
+        recordType: 'CONSULTATION',
+        diagnosis:
+          'Examen ginecológico de rutina normal. No se detectaron anomalías.',
+        prescription:
+          'Continuar con controles anuales. Suplemento de ácido fólico 400mcg diario.',
+        notes:
+          'Paciente en buen estado general. Última citología hace 1 año con resultados normales. Se recomienda mantener hábitos saludables.',
+        vitalSigns: {
+          bloodPressure: '120/80',
+          heartRate: 72,
+          temperature: 36.5,
+          weight: 65,
+          height: 165,
+        },
+        attachments: [],
+        createdById: attendedAppointments[0].doctor.userId,
+      },
+    });
+
+    // Access log para creación
+    await prisma.medicalRecordAccessLog.create({
+      data: {
+        recordId: record1.id,
+        userId: attendedAppointments[0].doctor.userId,
+        action: 'CREATE',
+        metadata: {
+          recordType: 'CONSULTATION',
+          appointmentId: attendedAppointments[0].id,
+        },
+      },
+    });
+
+    // Access log para visualización por el paciente
+    await prisma.medicalRecordAccessLog.create({
+      data: {
+        recordId: record1.id,
+        userId: attendedAppointments[0].userId,
+        action: 'VIEW',
+        metadata: {
+          viewedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        },
+      },
+    });
+  }
+
+  // Medical Record 2: Dolor de oído (Patient2 - Doctor9)
+  if (attendedAppointments[1]) {
+    const record2 = await prisma.medicalRecord.create({
+      data: {
+        appointmentId: attendedAppointments[1].id,
+        recordType: 'CONSULTATION',
+        diagnosis:
+          'Otitis media aguda del oído derecho. Infección bacteriana leve.',
+        prescription:
+          'Amoxicilina 500mg cada 8 horas por 7 días. Ibuprofeno 400mg cada 8 horas si hay dolor. Gotas óticas con ciprofloxacino 3 gotas cada 12 horas.',
+        notes:
+          'Paciente refiere dolor intenso en oído derecho desde hace 3 días. Tímpano inflamado con secreción purulenta. Se indica reposo relativo y evitar mojar el oído. Control en 7 días.',
+        vitalSigns: {
+          bloodPressure: '115/75',
+          heartRate: 78,
+          temperature: 37.8,
+          weight: 58,
+          height: 160,
+        },
+        attachments: [],
+        createdById: attendedAppointments[1].doctor.userId,
+      },
+    });
+
+    await prisma.medicalRecordAccessLog.create({
+      data: {
+        recordId: record2.id,
+        userId: attendedAppointments[1].doctor.userId,
+        action: 'CREATE',
+        metadata: {
+          recordType: 'CONSULTATION',
+          appointmentId: attendedAppointments[1].id,
+        },
+      },
+    });
+
+    await prisma.medicalRecordAccessLog.create({
+      data: {
+        recordId: record2.id,
+        userId: attendedAppointments[1].userId,
+        action: 'VIEW',
+        metadata: {
+          viewedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+        },
+      },
+    });
+  }
+
+  // Medical Record 3: Chequeo cardíaco (Patient5 - Doctor1)
+  if (attendedAppointments[2]) {
+    const record3 = await prisma.medicalRecord.create({
+      data: {
+        appointmentId: attendedAppointments[2].id,
+        recordType: 'FOLLOW_UP',
+        diagnosis:
+          'Control cardiológico. Electrocardiograma dentro de parámetros normales. Presión arterial controlada.',
+        prescription:
+          'Continuar con Enalapril 10mg una vez al día. Atorvastatina 20mg por la noche. Dieta baja en sodio.',
+        notes:
+          'Paciente con antecedentes de hipertensión arterial controlada. ECG muestra ritmo sinusal normal. No se detectan soplos cardíacos. Colesterol total: 180 mg/dL, LDL: 110 mg/dL, HDL: 55 mg/dL. Se recomienda ejercicio moderado 30 minutos diarios. Próximo control en 6 meses.',
+        vitalSigns: {
+          bloodPressure: '130/85',
+          heartRate: 68,
+          temperature: 36.7,
+          weight: 82,
+          height: 175,
+        },
+        attachments: [
+          {
+            key: 'medical-records/fake-record-3/ecg-report.pdf',
+            name: 'Electrocardiograma.pdf',
+            uploadedAt: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000),
+            size: 245680,
+          },
+        ],
+        createdById: attendedAppointments[2].doctor.userId,
+      },
+    });
+
+    await prisma.medicalRecordAccessLog.createMany({
+      data: [
+        {
+          recordId: record3.id,
+          userId: attendedAppointments[2].doctor.userId,
+          action: 'CREATE',
+          metadata: {
+            recordType: 'FOLLOW_UP',
+            appointmentId: attendedAppointments[2].id,
+          },
+        },
+        {
+          recordId: record3.id,
+          userId: attendedAppointments[2].doctor.userId,
+          action: 'UPLOAD_FILE',
+          metadata: {
+            fileName: 'Electrocardiograma.pdf',
+            fileSize: 245680,
+          },
+        },
+        {
+          recordId: record3.id,
+          userId: attendedAppointments[2].userId,
+          action: 'VIEW',
+          metadata: {
+            viewedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          },
+        },
+        {
+          recordId: record3.id,
+          userId: attendedAppointments[2].userId,
+          action: 'DOWNLOAD_FILE',
+          metadata: {
+            fileName: 'Electrocardiograma.pdf',
+          },
+        },
+      ],
+    });
+  }
+
+  // Medical Record 4: Esguince de tobillo (Patient8 - Doctor4)
+  if (attendedAppointments[3]) {
+    const record4 = await prisma.medicalRecord.create({
+      data: {
+        appointmentId: attendedAppointments[3].id,
+        recordType: 'EMERGENCY',
+        diagnosis:
+          'Esguince de tobillo derecho grado II. Ligamento peroneoastragalino anterior parcialmente lesionado.',
+        prescription:
+          'Reposo relativo 2 semanas. Hielo local 20 minutos cada 4 horas primeros 3 días. Vendaje compresivo. Diclofenaco 50mg cada 12 horas por 5 días. Fisioterapia después de 1 semana.',
+        notes:
+          'Paciente sufrió caída jugando fútbol hace 2 horas. Tobillo inflamado con equimosis lateral. Dolor intenso a la palpación. Radiografía descarta fractura. Se indica uso de muletas por 1 semana. Elevación del miembro afectado. Control con traumatología en 10 días.',
+        vitalSigns: {
+          bloodPressure: '125/80',
+          heartRate: 85,
+          temperature: 36.8,
+          weight: 62,
+          height: 158,
+        },
+        attachments: [
+          {
+            key: 'medical-records/fake-record-4/radiografia-tobillo.jpg',
+            name: 'Radiografía Tobillo Derecho.jpg',
+            uploadedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            size: 1024000,
+          },
+          {
+            key: 'medical-records/fake-record-4/plan-fisioterapia.pdf',
+            name: 'Plan de Fisioterapia.pdf',
+            uploadedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            size: 156789,
+          },
+        ],
+        createdById: attendedAppointments[3].doctor.userId,
+      },
+    });
+
+    await prisma.medicalRecordAccessLog.createMany({
+      data: [
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].doctor.userId,
+          action: 'CREATE',
+          metadata: {
+            recordType: 'EMERGENCY',
+            appointmentId: attendedAppointments[3].id,
+          },
+        },
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].doctor.userId,
+          action: 'UPLOAD_FILE',
+          metadata: {
+            fileName: 'Radiografía Tobillo Derecho.jpg',
+            fileSize: 1024000,
+          },
+        },
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].doctor.userId,
+          action: 'UPLOAD_FILE',
+          metadata: {
+            fileName: 'Plan de Fisioterapia.pdf',
+            fileSize: 156789,
+          },
+        },
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].userId,
+          action: 'VIEW',
+          metadata: {
+            viewedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          },
+        },
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].userId,
+          action: 'DOWNLOAD_FILE',
+          metadata: {
+            fileName: 'Radiografía Tobillo Derecho.jpg',
+          },
+        },
+        {
+          recordId: record4.id,
+          userId: attendedAppointments[3].userId,
+          action: 'DOWNLOAD_FILE',
+          metadata: {
+            fileName: 'Plan de Fisioterapia.pdf',
+          },
+        },
+      ],
+    });
+  }
+
+  console.log(
+    '✅ Expedientes médicos creados con diagnósticos, prescripciones y archivos adjuntos',
+  );
+  console.log(
+    '✅ Logs de acceso registrados para auditoría (CREATE, VIEW, UPLOAD_FILE, DOWNLOAD_FILE)',
+  );
+
+  // ====================== PAYMENTS ======================
+  // Crear pagos para algunas citas confirmadas y atendidas
+  const paidAppointments = await prisma.appointment.findMany({
+    where: {
+      OR: [{ status: 'CONFIRMED' }, { status: 'ATTENDED' }],
+    },
+    include: {
+      doctor: {
+        include: {
+          user: true,
+          specialty: true,
+        },
+      },
+      user: true,
+      slot: true,
+    },
+    take: 8,
+  });
+
+  console.log(`💳 Creando pagos para ${paidAppointments.length} citas...`);
+
+  for (let i = 0; i < paidAppointments.length; i++) {
+    const apt = paidAppointments[i];
+    const isCompleted = i % 3 !== 0; // 2 de cada 3 pagos completados
+    const isPending = i % 3 === 0;
+
+    await prisma.payment.create({
+      data: {
+        appointmentId: apt.id,
+        amount: apt.doctor.consultationPrice || 100,
+        currency: 'PEN',
+        paymentMethod: i % 2 === 0 ? 'SIMULATED_CARD' : 'CASH_AT_CLINIC',
+        status: isPending ? 'PENDING' : 'COMPLETED',
+        transactionId: `TXN-${Date.now()}-${Math.random().toString(36).substring(7)}-${i}`,
+        metadata: {
+          patientName: `${apt.user.firstName} ${apt.user.lastName}`,
+          doctorName: `Dr(a). ${apt.doctor.user?.firstName || 'Doctor'}`,
+          specialty: apt.doctor.specialty?.name || 'Consulta General',
+          appointmentDate: apt.slot?.startAt || new Date(),
+        },
+        paidAt: isCompleted
+          ? new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000)
+          : undefined,
+      },
+    });
+  }
+
+  console.log('✅ Pagos creados con diferentes estados (COMPLETED, PENDING)');
 }
 
 void main()

@@ -83,6 +83,7 @@ export class AppointmentsService {
             lastName: true,
             email: true,
             phone: true,
+            dni: true,
           },
         },
         doctor: {

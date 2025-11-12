@@ -63,14 +63,17 @@ export class S3Service {
     fileType: string,
     expiresIn: number = 300, // 5 minutos
   ): Promise<{ uploadUrl: string; key: string }> {
-    // Generar key única: profile-images/<userId>/<uuid>-<fileName>
+    // Generar key única: public/profile-images/<userId>/<uuid>-<fileName>
     const sanitizedFileName = this.sanitizeFileName(fileName);
     const uniqueFileName = `${uuidv4()}-${sanitizedFileName}`;
-    const key = `profile-images/${userId}/${uniqueFileName}`;
+    // Key real que se usará en S3 QUE ES LA RUTA EN AWS
+    const s3Key = `public/profile-images/${userId}/${uniqueFileName}`;
+    // Key limpio que guardará el frontend / DB
+    const publicKey = `profile-images/${userId}/${uniqueFileName}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
-      Key: key,
+      Key: s3Key,
       ContentType: fileType,
       // Metadata opcional
       Metadata: {
@@ -84,9 +87,9 @@ export class S3Service {
         expiresIn,
       });
 
-      this.logger.log(`Generated upload URL for user ${userId}: ${key}`);
+      this.logger.log(`Generated upload URL for user ${userId}: ${publicKey}`);
 
-      return { uploadUrl, key };
+      return { uploadUrl, key: publicKey };
     } catch (error) {
       this.logger.error(
         `Failed to generate upload URL: ${(error as Error).message}`,
