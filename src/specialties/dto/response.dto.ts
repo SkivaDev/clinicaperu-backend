@@ -33,6 +33,9 @@ export class ResponseDto<T> {
   @ApiPropertyOptional({ description: 'Mensaje de error (si aplica)' })
   error?: string;
 
+  @ApiPropertyOptional({ description: 'Datos estadísticos' })
+  stats?: any;
+
   @ApiPropertyOptional({
     description: 'Metadatos de paginación',
     type: PaginationMetaDto,

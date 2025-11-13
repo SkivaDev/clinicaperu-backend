@@ -80,6 +80,7 @@ export class SpecialtiesController {
       statusCode: HttpStatus.OK,
       message: 'Especialidades obtenidas exitosamente',
       data: result.data,
+      stats: result.stats,
       meta: result.meta,
     };
   }
@@ -192,6 +193,44 @@ export class SpecialtiesController {
       statusCode: HttpStatus.OK,
       message: 'Validación completada',
       data: validation,
+    };
+  }
+
+  @Patch(':id/deactivate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Desactivar especialidad con validación de dependencias',
+    description:
+      'Desactiva una especialidad solo si no tiene doctores activos ni citas futuras programadas',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la especialidad a desactivar' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Especialidad desactivada exitosamente',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'No se puede desactivar (tiene doctores activos o citas futuras)',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Especialidad no encontrada',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'La especialidad ya está desactivada',
+  })
+  async deactivate(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<SpecialtyResponseDto>> {
+    const deactivatedSpecialty =
+      await this.specialtiesService.deactivateSpecialty(id);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Especialidad desactivada exitosamente',
+      data: deactivatedSpecialty,
     };
   }
 }

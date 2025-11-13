@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSpecialtyDto } from './dto/create-specialty.dto';
 import { UpdateSpecialtyDto } from './dto/update-specialty.dto';
@@ -10,8 +10,10 @@ import {
 import {
   SpecialtyNotFoundException,
   SpecialtyAlreadyExistsException,
-  SpecialtyCannotBeDeletedException,
+  // SpecialtyCannotBeDeletedException,
+  SpecialtyCannotBeDeactivatedException,
 } from './exceptions/specialty.exceptions';
+import { SpecialtiesStatsDto } from './dto/stats-specialty.dto';
 
 @Injectable()
 export class SpecialtiesService {
@@ -22,6 +24,7 @@ export class SpecialtiesService {
    */
   async listSpecialties(query?: QuerySpecialtyDto): Promise<{
     data: SpecialtyResponseDto[];
+    stats: SpecialtiesStatsDto;
     meta: {
       total: number;
       page: number;
@@ -118,8 +121,27 @@ export class SpecialtiesService {
       }),
     );
 
+    // Obtener estadísticas
+    const totalSpecialties = await this.prisma.specialty.count();
+    const activeSpecialties = await this.prisma.specialty.count({
+      where: { isActive: true },
+    });
+    const inactiveSpecialties = totalSpecialties - activeSpecialties;
+
+    const totalDoctors = await this.prisma.doctor.count();
+    const activeDoctors = await this.prisma.doctor.count({
+      where: { isActive: true },
+    });
+
     return {
       data,
+      stats: {
+        totalSpecialties,
+        activeSpecialties,
+        inactiveSpecialties,
+        totalDoctors,
+        activeDoctors,
+      },
       meta: {
         total,
         page,
@@ -435,6 +457,62 @@ export class SpecialtiesService {
         activeDoctors,
         upcomingAppointments,
       },
+    };
+  }
+
+  /**
+   * 🔒 Desactivar especialidad con validación estricta
+   * Solo permite desactivar si no hay doctores activos ni citas futuras
+   */
+  async deactivateSpecialty(id: string): Promise<SpecialtyResponseDto> {
+    // Verificar que la especialidad existe
+    const specialty = await this.getSpecialtyById(id);
+
+    // Verificar si ya está desactivada
+    if (!specialty.isActive) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'La especialidad ya está desactivada',
+          error: `La especialidad '${specialty.name}' ya se encuentra inactiva`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Validar dependencias
+    const validation = await this.canDeactivate(id);
+
+    if (!validation.canDeactivate) {
+      throw new SpecialtyCannotBeDeactivatedException(
+        validation.reasons,
+        validation.metadata,
+      );
+    }
+
+    // Desactivar la especialidad
+    const deactivated = await this.prisma.specialty.update({
+      where: { id },
+      data: { isActive: false },
+      include: {
+        _count: {
+          select: {
+            doctors: true,
+          },
+        },
+      },
+    });
+
+    return {
+      id: deactivated.id,
+      name: deactivated.name,
+      description: deactivated.description,
+      isActive: deactivated.isActive,
+      createdAt: deactivated.createdAt,
+      updatedAt: deactivated.updatedAt,
+      doctorsCount: deactivated._count.doctors,
+      activeDoctorsCount: 0, // Ya validamos que no hay doctores activos
+      upcomingAppointmentsCount: 0, // Ya validamos que no hay citas futuras
     };
   }
 }
