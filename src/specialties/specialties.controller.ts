@@ -26,8 +26,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-// import { ResponseDto } from '../common/dto/response.dto';
-import { ResponseDto } from './dto/response.dto'; //TODO: Este ReponseDto es temporan, porque otros endpoints no soportan esta ultima version
+import { ResponseDto } from '../common/dto/response.dto';
+// import { ResponseDto } from './dto/response.dto'; //TODO: Este ReponseDto es temporan, porque otros endpoints no soportan esta ultima version
 import {
   SpecialtyResponseDto,
   CanDeactivateResponseDto,

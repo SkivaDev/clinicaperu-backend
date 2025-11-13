@@ -75,16 +75,16 @@ export class PaymentHistoryItemDto {
 
 export class PaymentHistoryMetaDto {
   @ApiProperty()
-  totalCount: number;
+  total: number;
 
   @ApiProperty()
-  pageCount: number;
+  totalPages: number;
 
   @ApiProperty()
-  currentPage: number;
+  page: number;
 
   @ApiProperty()
-  perPage: number;
+  limit: number;
 
   @ApiProperty()
   hasNextPage: boolean;
