@@ -2,6 +2,7 @@ import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { SpecialtiesService } from './specialties.service';
 import { SpecialtyResponseDto } from './dto/specialty-response.dto';
+import { SpecialtySortBy } from './dto/query-specialty.dto';
 import { Public } from 'src/auth/decorators/public.decorator';
 import { ResponseDto } from 'src/common/dto/response.dto';
 
@@ -22,11 +23,25 @@ export class PublicSpecialtiesController {
     type: [SpecialtyResponseDto],
   })
   async findAll(): Promise<ResponseDto<SpecialtyResponseDto[]>> {
-    const specialties = await this.specialtiesService.listSpecialties();
+    const { data, meta } = await this.specialtiesService.listSpecialties({
+      isActive: true,
+      sortBy: SpecialtySortBy.NAME,
+      sortOrder: 'asc',
+      page: 1,
+      limit: 100,
+    });
     return {
       statusCode: HttpStatus.OK,
       message: 'Specialties retrieved successfully',
-      data: specialties,
+      data,
+      meta: {
+        totalCount: meta.total,
+        pageCount: meta.totalPages,
+        currentPage: meta.page,
+        perPage: meta.limit,
+        hasNextPage: meta.hasNextPage,
+        hasPrevPage: meta.hasPrevPage,
+      },
     };
   }
 }
