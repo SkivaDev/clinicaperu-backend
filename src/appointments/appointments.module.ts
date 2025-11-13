@@ -7,9 +7,10 @@ import { AppointmentsService } from './appointments.service';
 import { AppointmentsCronService } from './appointments-cron.service';
 import { BookingService } from './booking.service';
 import { DoctorSlotOwnershipGuard } from './guards/doctor-slot-ownership.guard';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
-  imports: [PrismaModule, S3Module, ScheduleModule.forRoot()],
+  imports: [PrismaModule, S3Module, EmailModule, ScheduleModule.forRoot()],
   controllers: [AppointmentsController],
   providers: [
     AppointmentsService,

@@ -9,7 +9,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { BookAppointmentDto } from './dto/book-appointment.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
-import { SlotStatus, AppointmentStatus } from '@prisma/client';
+import { SlotStatus, AppointmentStatus, EmailTemplate } from '@prisma/client';
+import { EmailService } from 'src/email/email.service';
+import { BookingEmailData } from './types/bookingEmailData';
+import { format } from 'date-fns';
 
 @Injectable()
 export class BookingService {
@@ -18,7 +21,10 @@ export class BookingService {
   private readonly MAX_RETRIES = 1; // Retry 1 vez en caso de deadlock
   private readonly RETRY_DELAY = 100; // 100ms backoff
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /**
    * HU-023: Atomic Booking - Reserva un slot de forma atómica (Patient o Admin)
@@ -60,7 +66,6 @@ export class BookingService {
         );
         return result;
       } catch (error) {
-
         // Si es un deadlock, reintentar
         if (this.isDeadlockError(error) && attempt < this.MAX_RETRIES) {
           attempt++;
@@ -132,7 +137,6 @@ export class BookingService {
         );
         return result;
       } catch (error) {
-
         // Si es un deadlock, reintentar
         if (this.isDeadlockError(error) && attempt < this.MAX_RETRIES) {
           attempt++;
@@ -193,7 +197,12 @@ export class BookingService {
           this.validateSlot(slot, logContext);
 
           // 3. Validar límite de citas del paciente (opcional)
-          await this.validatePatientLimit(tx, patientId, slot.doctorId, logContext);
+          await this.validatePatientLimit(
+            tx,
+            patientId,
+            slot.doctorId,
+            logContext,
+          );
 
           // 4. Obtener información del doctor para la respuesta
           const doctor = await tx.doctor.findUnique({
@@ -214,6 +223,7 @@ export class BookingService {
                 select: {
                   id: true,
                   name: true,
+                  address: true,
                 },
               },
             },
@@ -235,7 +245,7 @@ export class BookingService {
           const appointment = await tx.appointment.create({
             data: {
               userId: patientId,
-              doctorId: slot.doctorId,
+              doctorId: doctor.id,
               slotId: bookingDto.slotId,
               reason: bookingDto.reason,
               notes: bookingDto.notes,
@@ -278,21 +288,40 @@ export class BookingService {
             },
           });
 
-          // 9. HU-030: Encolar email según método de pago
-          await this.enqueuePaymentEmail(
-            tx,
-            bookingDto.paymentMethod,
-            patient?.email || '',
-            patient?.firstName || '',
-            patient?.lastName || '',
-            doctor.user.firstName,
-            doctor.user.lastName,
-            doctor.specialty.name,
-            slot.startAt,
-            payment.amount,
+          if (!patient) {
+            throw new BadRequestException('Patient not found');
+          }
+
+          // 9. ANTES: HU-030: Encolar email según método de pago
+          // 9.AHORA: IMPORTANTE: Encolar email FUERA de la transacción
+          // Guardamos la info necesaria para enviar el email después
+          // await this.enqueuePaymentEmail(
+          //   tx,
+          //   bookingDto.paymentMethod,
+          //   patient?.email || '',
+          //   patient?.firstName || '',
+          //   patient?.lastName || '',
+          //   doctor.user.firstName,
+          //   doctor.user.lastName,
+          //   doctor.specialty.name,
+          //   slot.startAt,
+          //   payment.amount,
+          //   expiresAt,
+          //   logContext,
+          // );
+
+          const emailData = {
+            patientEmail: patient.email,
+            patientName: `${patient?.firstName} ${patient?.lastName}`,
+            doctorName: `${doctor.user.firstName} ${doctor.user.lastName}`,
+            specialty: doctor.specialty.name,
+            appointmentDate: format(new Date(slot.startAt), 'dd/MM/yyyy'),
+            appointmentTime: format(new Date(slot.startAt), 'HH:mm'),
+            location: `${doctor.clinic.name} - ${doctor.clinic.address}`,
+            amount: Number(payment.amount),
+            paymentMethod: bookingDto.paymentMethod,
             expiresAt,
-            logContext,
-          );
+          };
 
           // 10. Registrar en audit log
           await this.logBookingAudit(
@@ -310,34 +339,37 @@ export class BookingService {
 
           // 11. HU-030: Construir respuesta con información de pago
           return {
-            id: appointment.id,
-            slotId: appointment.slotId,
-            userId: appointment.userId,
-            doctorId: appointment.doctorId,
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            status: appointment.status,
-            reason: appointment.reason || bookingDto.reason,
-            notes: appointment.notes || undefined,
-            createdAt: appointment.createdAt,
-            doctor: {
-              id: doctor.id,
-              name: `${doctor.user.firstName} ${doctor.user.lastName}`,
-              specialty: doctor.specialty.name,
+            appointment: {
+              id: appointment.id,
+              slotId: appointment.slotId,
+              userId: appointment.userId,
+              doctorId: appointment.doctorId,
+              startAt: slot.startAt,
+              endAt: slot.endAt,
+              status: appointment.status,
+              reason: appointment.reason || bookingDto.reason,
+              notes: appointment.notes || undefined,
+              createdAt: appointment.createdAt,
+              doctor: {
+                id: doctor.id,
+                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                specialty: doctor.specialty.name,
+              },
+              clinic: {
+                id: doctor.clinic.id,
+                name: doctor.clinic.name,
+              },
+              // HU-030: Información de pago
+              paymentId: payment.id,
+              payment: {
+                amount: Number(payment.amount),
+                currency: payment.currency,
+                status: payment.status,
+                paymentMethod: payment.paymentMethod,
+                expiresAt: payment.expiresAt || undefined,
+              },
             },
-            clinic: {
-              id: doctor.clinic.id,
-              name: doctor.clinic.name,
-            },
-            // HU-030: Información de pago
-            paymentId: payment.id,
-            payment: {
-              amount: Number(payment.amount),
-              currency: payment.currency,
-              status: payment.status,
-              paymentMethod: payment.paymentMethod,
-              expiresAt: payment.expiresAt || undefined,
-            },
+            emailData,
           };
         },
         {
@@ -347,7 +379,10 @@ export class BookingService {
         },
       );
 
-      return result;
+      // ✅ 10. FUERA DE LA TRANSACCIÓN: Encolar email usando EmailService
+      await this.sendBookingEmail(result.emailData, logContext);
+
+      return result.appointment;
     } catch (error) {
       const duration = Date.now() - startTime;
       this.logger.error(
@@ -363,6 +398,106 @@ export class BookingService {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVO (Implementar envio email por BullMQ): Envía email usando EmailService (FUERA de la transacción)
+   */
+
+  private async sendBookingEmail(
+    emailData: BookingEmailData,
+    logContext: string,
+  ): Promise<void> {
+    try {
+      // Validar que tengamos el email del paciente
+      if (!emailData.patientEmail) {
+        this.logger.warn(
+          `${logContext} Cannot send email: patient email is missing`,
+        );
+        return;
+      }
+
+      // Variables base comunes para ambos tipos de pago
+      const baseVariables = {
+        patientName: emailData.patientName,
+        doctorName: emailData.doctorName,
+        specialty: emailData.specialty,
+        date: emailData.appointmentDate,
+        time: emailData.appointmentTime,
+        location: emailData.location,
+      };
+
+      if (emailData.paymentMethod === 'CASH_AT_CLINIC') {
+        // Email para pago en efectivo
+        await this.emailService.enqueueEmail(
+          emailData.patientEmail,
+          EmailTemplate.BOOKING_CONFIRMATION,
+          {
+            ...baseVariables,
+            paymentMethod: 'Efectivo en clínica',
+            amount: emailData.amount.toString(),
+            message:
+              'Por favor, realiza el pago en recepción antes de tu consulta.',
+          },
+        );
+
+        this.logger.log(
+          `${logContext} Cash payment email enqueued for ${emailData.patientEmail}`,
+        );
+      } else if (emailData.paymentMethod === 'CARD') {
+        // Email para pago con tarjeta
+        if (!emailData.expiresAt) {
+          this.logger.warn(
+            `${logContext} Card payment email missing expiresAt, using default message`,
+          );
+        }
+
+        await this.emailService.enqueueEmail(
+          emailData.patientEmail,
+          EmailTemplate.BOOKING_CONFIRMATION,
+          {
+            ...baseVariables,
+            paymentMethod: 'Tarjeta',
+            amount: emailData.amount.toString(),
+            ...(emailData.expiresAt && {
+              expiresAt: emailData.expiresAt.toISOString(),
+            }),
+            message:
+              'Tienes 15 minutos para completar el pago y confirmar tu cita.',
+          },
+        );
+
+        this.logger.log(
+          `${logContext} Card payment email enqueued for ${emailData.patientEmail}`,
+        );
+      } else {
+        // Método de pago desconocido - enviar email genérico
+        this.logger.warn(
+          `${logContext} Unknown payment method: ${emailData.paymentMethod}, sending generic email`,
+        );
+
+        await this.emailService.enqueueEmail(
+          emailData.patientEmail,
+          EmailTemplate.BOOKING_CONFIRMATION,
+          {
+            ...baseVariables,
+            paymentMethod: emailData.paymentMethod,
+            amount: emailData.amount.toString(),
+            message: 'Tu cita ha sido reservada exitosamente.',
+          },
+        );
+      }
+    } catch (error) {
+      // ⚠️ No lanzar error - el booking ya se completó
+      this.logger.error(
+        `${logContext} Failed to enqueue email: ${error.message}`,
+        error.stack,
+      );
+
+      // Opcional: Podrías registrar esto en una tabla de errores
+      // para poder reintentar manualmente después
+      // await this.logFailedEmail(emailData, error);
     }
   }
 
@@ -441,70 +576,70 @@ export class BookingService {
    * - CONFIRMED: Email de confirmación inmediata
    * - PENDING: Email pidiendo confirmación al paciente
    */
-  private async enqueueConfirmationEmail(
-    tx: any,
-    appointmentId: string,
-    appointmentStatus: AppointmentStatus,
-    patientEmail: string,
-    patientFirstName: string,
-    patientLastName: string,
-    doctorFirstName: string,
-    doctorLastName: string,
-    specialtyName: string,
-    appointmentDate: Date,
-    logContext: string,
-  ): Promise<void> {
-    try {
-      if (appointmentStatus === AppointmentStatus.CONFIRMED) {
-        // Email de confirmación inmediata (paciente/admin creó la cita)
-        this.logger.log(
-          `${logContext} Enqueuing confirmation email for appointment ${appointmentId} (CONFIRMED)`,
-        );
+  // private async enqueueConfirmationEmail(
+  //   tx: any,
+  //   appointmentId: string,
+  //   appointmentStatus: AppointmentStatus,
+  //   patientEmail: string,
+  //   patientFirstName: string,
+  //   patientLastName: string,
+  //   doctorFirstName: string,
+  //   doctorLastName: string,
+  //   specialtyName: string,
+  //   appointmentDate: Date,
+  //   logContext: string,
+  // ): Promise<void> {
+  //   try {
+  //     if (appointmentStatus === AppointmentStatus.CONFIRMED) {
+  //       // Email de confirmación inmediata (paciente/admin creó la cita)
+  //       this.logger.log(
+  //         `${logContext} Enqueuing confirmation email for appointment ${appointmentId} (CONFIRMED)`,
+  //       );
 
-        await tx.emailMessage.create({
-          data: {
-            to: patientEmail,
-            subject: 'Cita confirmada',
-            template: 'BOOKING_CONFIRMATION',
-            status: 'PENDING',
-            variables: {
-              patientName: `${patientFirstName} ${patientLastName}`,
-              doctorName: `${doctorFirstName} ${doctorLastName}`,
-              specialty: specialtyName,
-              appointmentDate: appointmentDate.toISOString(),
-              confirmedAt: new Date().toISOString(),
-            },
-          },
-        });
-      } else if (appointmentStatus === AppointmentStatus.PENDING) {
-        // Email pidiendo confirmación (doctor creó la cita)
-        this.logger.log(
-          `${logContext} Enqueuing confirmation request email for appointment ${appointmentId} (PENDING)`,
-        );
+  //       await tx.emailMessage.create({
+  //         data: {
+  //           to: patientEmail,
+  //           subject: 'Cita confirmada',
+  //           template: 'BOOKING_CONFIRMATION',
+  //           status: 'PENDING',
+  //           variables: {
+  //             patientName: `${patientFirstName} ${patientLastName}`,
+  //             doctorName: `${doctorFirstName} ${doctorLastName}`,
+  //             specialty: specialtyName,
+  //             appointmentDate: appointmentDate.toISOString(),
+  //             confirmedAt: new Date().toISOString(),
+  //           },
+  //         },
+  //       });
+  //     } else if (appointmentStatus === AppointmentStatus.PENDING) {
+  //       // Email pidiendo confirmación (doctor creó la cita)
+  //       this.logger.log(
+  //         `${logContext} Enqueuing confirmation request email for appointment ${appointmentId} (PENDING)`,
+  //       );
 
-        await tx.emailMessage.create({
-          data: {
-            to: patientEmail,
-            subject: 'Confirma tu cita médica',
-            template: 'BOOKING_CONFIRMATION', // Podríamos crear un template específico para PENDING
-            status: 'PENDING',
-            variables: {
-              patientName: `${patientFirstName} ${patientLastName}`,
-              doctorName: `${doctorFirstName} ${doctorLastName}`,
-              specialty: specialtyName,
-              appointmentDate: appointmentDate.toISOString(),
-              requiresConfirmation: true,
-            },
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error(
-        `${logContext} Failed to enqueue confirmation email: ${error.message}`,
-      );
-      // No lanzamos error para no fallar la transacción por un email
-    }
-  }
+  //       await tx.emailMessage.create({
+  //         data: {
+  //           to: patientEmail,
+  //           subject: 'Confirma tu cita médica',
+  //           template: 'BOOKING_CONFIRMATION', // Podríamos crear un template específico para PENDING
+  //           status: 'PENDING',
+  //           variables: {
+  //             patientName: `${patientFirstName} ${patientLastName}`,
+  //             doctorName: `${doctorFirstName} ${doctorLastName}`,
+  //             specialty: specialtyName,
+  //             appointmentDate: appointmentDate.toISOString(),
+  //             requiresConfirmation: true,
+  //           },
+  //         },
+  //       });
+  //     }
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `${logContext} Failed to enqueue confirmation email: ${error.message}`,
+  //     );
+  //     // No lanzamos error para no fallar la transacción por un email
+  //   }
+  // }
 
   /**
    * Registra la operación de booking en audit log
@@ -537,7 +672,7 @@ export class BookingService {
     // Códigos de error de PostgreSQL para deadlock
     const deadlockCodes = ['40P01', '40001', 'P2034'];
     return (
-      error.code && deadlockCodes.includes(error.code) ||
+      (error.code && deadlockCodes.includes(error.code)) ||
       error.message?.includes('deadlock') ||
       error.message?.includes('could not obtain lock')
     );
@@ -553,75 +688,75 @@ export class BookingService {
   /**
    * HU-030: Encola email según método de pago
    */
-  private async enqueuePaymentEmail(
-    tx: any,
-    paymentMethod: string,
-    patientEmail: string,
-    patientFirstName: string,
-    patientLastName: string,
-    doctorFirstName: string,
-    doctorLastName: string,
-    specialtyName: string,
-    appointmentDate: Date,
-    amount: any,
-    expiresAt: Date,
-    logContext: string,
-  ): Promise<void> {
-    try {
-      if (paymentMethod === 'CASH_AT_CLINIC') {
-        this.logger.log(
-          `${logContext} Enqueuing cash payment email for ${patientEmail}`,
-        );
+  // private async enqueuePaymentEmail(
+  //   tx: any,
+  //   paymentMethod: string,
+  //   patientEmail: string,
+  //   patientFirstName: string,
+  //   patientLastName: string,
+  //   doctorFirstName: string,
+  //   doctorLastName: string,
+  //   specialtyName: string,
+  //   appointmentDate: Date,
+  //   amount: any,
+  //   expiresAt: Date,
+  //   logContext: string,
+  // ): Promise<void> {
+  //   try {
+  //     if (paymentMethod === 'CASH_AT_CLINIC') {
+  //       this.logger.log(
+  //         `${logContext} Enqueuing cash payment email for ${patientEmail}`,
+  //       );
 
-        await tx.emailMessage.create({
-          data: {
-            to: patientEmail,
-            subject: 'Cita reservada - Pagar en recepción',
-            template: 'BOOKING_CONFIRMATION',
-            status: 'PENDING',
-            variables: {
-              patientName: `${patientFirstName} ${patientLastName}`,
-              doctorName: `${doctorFirstName} ${doctorLastName}`,
-              specialty: specialtyName,
-              appointmentDate: appointmentDate.toISOString(),
-              paymentMethod: 'Efectivo en clínica',
-              amount: amount.toString(),
-              message:
-                'Por favor, realiza el pago en recepción antes de tu consulta.',
-            },
-          },
-        });
-      } else {
-        this.logger.log(
-          `${logContext} Enqueuing card payment email for ${patientEmail}`,
-        );
+  //       await tx.emailMessage.create({
+  //         data: {
+  //           to: patientEmail,
+  //           subject: 'Cita reservada - Pagar en recepción',
+  //           template: 'BOOKING_CONFIRMATION',
+  //           status: 'PENDING',
+  //           variables: {
+  //             patientName: `${patientFirstName} ${patientLastName}`,
+  //             doctorName: `${doctorFirstName} ${doctorLastName}`,
+  //             specialty: specialtyName,
+  //             appointmentDate: appointmentDate.toISOString(),
+  //             paymentMethod: 'Efectivo en clínica',
+  //             amount: amount.toString(),
+  //             message:
+  //               'Por favor, realiza el pago en recepción antes de tu consulta.',
+  //           },
+  //         },
+  //       });
+  //     } else {
+  //       this.logger.log(
+  //         `${logContext} Enqueuing card payment email for ${patientEmail}`,
+  //       );
 
-        await tx.emailMessage.create({
-          data: {
-            to: patientEmail,
-            subject: 'Completa tu pago - Cita reservada temporalmente',
-            template: 'BOOKING_CONFIRMATION',
-            status: 'PENDING',
-            variables: {
-              patientName: `${patientFirstName} ${patientLastName}`,
-              doctorName: `${doctorFirstName} ${doctorLastName}`,
-              specialty: specialtyName,
-              appointmentDate: appointmentDate.toISOString(),
-              paymentMethod: 'Tarjeta',
-              amount: amount.toString(),
-              expiresAt: expiresAt.toISOString(),
-              message:
-                'Tienes 15 minutos para completar el pago y confirmar tu cita.',
-            },
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error(
-        `${logContext} Failed to enqueue payment email: ${(error as Error).message}`,
-      );
-    }
-  }
+  //       await tx.emailMessage.create({
+  //         data: {
+  //           to: patientEmail,
+  //           subject: 'Completa tu pago - Cita reservada temporalmente',
+  //           template: 'BOOKING_CONFIRMATION',
+  //           status: 'PENDING',
+  //           variables: {
+  //             patientName: `${patientFirstName} ${patientLastName}`,
+  //             doctorName: `${doctorFirstName} ${doctorLastName}`,
+  //             specialty: specialtyName,
+  //             appointmentDate: appointmentDate.toISOString(),
+  //             paymentMethod: 'Tarjeta',
+  //             amount: amount.toString(),
+  //             expiresAt: expiresAt.toISOString(),
+  //             message:
+  //               'Tienes 15 minutos para completar el pago y confirmar tu cita.',
+  //           },
+  //         },
+  //       });
+  //     }
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `${logContext} Failed to enqueue payment email: ${(error as Error).message}`,
+  //     );
+  //   }
+  // }
 
   /**
    * HU-030: Genera una cadena aleatoria para el transactionId

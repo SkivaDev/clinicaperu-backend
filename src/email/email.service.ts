@@ -4,7 +4,10 @@ import { Queue } from 'bullmq';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailTemplate, EmailStatus } from '@prisma/client';
 import { EmailProviderFactory } from './providers/email-provider.factory';
-import { IEmailProvider, EmailProviderType } from './interfaces/email-provider.interface';
+import {
+  IEmailProvider,
+  EmailProviderType,
+} from './interfaces/email-provider.interface';
 
 @Injectable()
 export class EmailService implements OnModuleInit {
@@ -32,10 +35,14 @@ export class EmailService implements OnModuleInit {
       // Perform health check
       const isHealthy = await this.emailProvider.isHealthy();
       if (!isHealthy) {
-        this.logger.warn(`⚠️ Email provider ${this.emailProvider.getProviderName()} health check failed`);
+        this.logger.warn(
+          `⚠️ Email provider ${this.emailProvider.getProviderName()} health check failed`,
+        );
       }
 
-      this.logger.log(`✅ Email service initialized with ${this.emailProvider.getProviderName()} provider`);
+      this.logger.log(
+        `✅ Email service initialized with ${this.emailProvider.getProviderName()} provider`,
+      );
     } catch (error) {
       this.logger.error('❌ Failed to initialize email provider', error);
       throw error;
@@ -110,7 +117,46 @@ export class EmailService implements OnModuleInit {
 
   /**
    * Validate that all required variables are present for a template
+   * Variables opcionales NO causan error
    */
+  // private validateTemplateVariables(
+  //   template: EmailTemplate,
+  //   variables: Record<string, any>,
+  // ): void {
+  //   const requiredVars: Record<EmailTemplate, string[]> = {
+  //     [EmailTemplate.BOOKING_CONFIRMATION]: [
+  //       'patientName',
+  //       'doctorName',
+  //       'specialty',
+  //       'date',
+  //       'time',
+  //       'location',
+  //     ],
+  //     [EmailTemplate.BOOKING_CANCELLATION]: [
+  //       'patientName',
+  //       'doctorName',
+  //       'date',
+  //       'time',
+  //     ],
+  //     [EmailTemplate.BOOKING_REMINDER]: [
+  //       'patientName',
+  //       'doctorName',
+  //       'time',
+  //       'location',
+  //     ],
+  //     [EmailTemplate.PASSWORD_RESET]: ['userName', 'resetLink'],
+  //     [EmailTemplate.WELCOME]: ['userName'],
+  //   };
+
+  //   const required = requiredVars[template] || [];
+  //   const missing = required.filter((key) => !variables[key]);
+
+  //   if (missing.length > 0) {
+  //     throw new Error(
+  //       `Missing required variables for template ${template}: ${missing.join(', ')}`,
+  //     );
+  //   }
+  // }
   private validateTemplateVariables(
     template: EmailTemplate,
     variables: Record<string, any>,
@@ -123,6 +169,11 @@ export class EmailService implements OnModuleInit {
         'date',
         'time',
         'location',
+        // Opcionales (no se validan):
+        // - paymentMethod
+        // - amount
+        // - message
+        // - expiresAt
       ],
       [EmailTemplate.BOOKING_CANCELLATION]: [
         'patientName',
@@ -148,8 +199,17 @@ export class EmailService implements OnModuleInit {
         `Missing required variables for template ${template}: ${missing.join(', ')}`,
       );
     }
-  }
 
+    // ✅ Log de advertencia para variables opcionales comunes (útil para debug)
+    const optionalVars = ['paymentMethod', 'amount', 'message', 'expiresAt'];
+    const providedOptional = optionalVars.filter((key) => variables[key]);
+
+    if (providedOptional.length > 0) {
+      this.logger.debug(
+        `Template ${template} received optional variables: ${providedOptional.join(', ')}`,
+      );
+    }
+  }
   /**
    * Get subject line for a template
    */
@@ -189,16 +249,145 @@ export class EmailService implements OnModuleInit {
   }
 
   /**
-   * Template: BOOKING_CONFIRMATION
+   * Template: BOOKING_CONFIRMATION (con información de pago)
    */
+  //   private renderBookingConfirmation(variables: Record<string, any>): string {
+  //     return `
+  // <!DOCTYPE html>
+  // <html>
+  // <head>
+  //   <meta charset="UTF-8">
+  //   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //   <title>Appointment Confirmation</title>
+  // </head>
+  // <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  //   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+  //     <tr>
+  //       <td align="center">
+  //         <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+  //           <!-- Header -->
+  //           <tr>
+  //             <td style="background-color: #2563eb; padding: 30px; text-align: center;">
+  //               <h1 style="color: #ffffff; margin: 0; font-size: 28px;">✓ Appointment Confirmed!</h1>
+  //             </td>
+  //           </tr>
+
+  //           <!-- Body -->
+  //           <tr>
+  //             <td style="padding: 40px 30px;">
+  //               <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+  //                 Dear <strong>${variables.patientName}</strong>,
+  //               </p>
+
+  //               <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+  //                 Your appointment has been successfully confirmed. Here are the details:
+  //               </p>
+
+  //               <!-- Appointment Details Table -->
+  //               <table width="100%" cellpadding="12" cellspacing="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 30px;">
+  //                 <tr>
+  //                   <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Doctor:</td>
+  //                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.doctorName}</td>
+  //                 </tr>
+  //                 <tr>
+  //                   <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Specialty:</td>
+  //                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.specialty}</td>
+  //                 </tr>
+  //                 <tr>
+  //                   <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Date:</td>
+  //                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.date}</td>
+  //                 </tr>
+  //                 <tr>
+  //                   <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Time:</td>
+  //                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.time}</td>
+  //                 </tr>
+  //                 <tr>
+  //                   <td style="color: #666666; font-size: 14px; font-weight: bold;">Location:</td>
+  //                   <td style="color: #333333; font-size: 14px;">${variables.location}</td>
+  //                 </tr>
+  //               </table>
+
+  //               <!-- Important Note -->
+  //               <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+  //                 <p style="color: #92400e; font-size: 14px; margin: 0; line-height: 1.5;">
+  //                   <strong>⏰ Important:</strong> Please arrive 15 minutes early to complete any necessary paperwork.
+  //                 </p>
+  //               </div>
+
+  //               <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0;">
+  //                 If you need to cancel or reschedule, please contact us at least 24 hours in advance.
+  //               </p>
+  //             </td>
+  //           </tr>
+
+  //           <!-- Footer -->
+  //           <tr>
+  //             <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
+  //               <p style="color: #666666; font-size: 12px; margin: 0; line-height: 1.5;">
+  //                 Clínica Perú - Quality Healthcare<br>
+  //                 This is an automated message, please do not reply to this email.
+  //               </p>
+  //             </td>
+  //           </tr>
+  //         </table>
+  //       </td>
+  //     </tr>
+  //   </table>
+  // </body>
+  // </html>
+  //     `.trim();
+  //   }
   private renderBookingConfirmation(variables: Record<string, any>): string {
+    // Variables opcionales para pagos
+    const paymentMethod = variables.paymentMethod || null;
+    const amount = variables.amount || null;
+    const message = variables.message || null;
+    const expiresAt = variables.expiresAt || null;
+
+    // Calcular tiempo restante si hay expiración
+    let expirationWarning = '';
+    if (expiresAt) {
+      const expiryDate = new Date(expiresAt);
+      const minutesLeft = Math.round(
+        (expiryDate.getTime() - Date.now()) / 60000,
+      );
+      expirationWarning = `
+      <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+        <p style="color: #92400e; font-size: 14px; margin: 0; line-height: 1.5;">
+          <strong>⏰ ¡Importante!</strong> Tienes ${minutesLeft} minutos para completar el pago. La reserva expira a las ${expiryDate.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}.
+        </p>
+      </div>
+    `;
+    }
+
+    // Sección de pago
+    let paymentSection = '';
+    if (paymentMethod && amount) {
+      paymentSection = `
+      <div style="background-color: #f0f9ff; border: 2px solid #0284c7; padding: 20px; margin: 30px 0; border-radius: 8px;">
+        <h3 style="color: #0284c7; margin: 0 0 15px 0; font-size: 18px;">💳 Información de Pago</h3>
+        <table width="100%" cellpadding="8" cellspacing="0">
+          <tr>
+            <td style="color: #666666; font-size: 14px; font-weight: bold;">Método de pago:</td>
+            <td style="color: #333333; font-size: 14px;">${paymentMethod}</td>
+          </tr>
+          <tr>
+            <td style="color: #666666; font-size: 14px; font-weight: bold;">Monto:</td>
+            <td style="color: #333333; font-size: 14px; font-weight: bold;">S/ ${amount}</td>
+          </tr>
+        </table>
+        ${message ? `<p style="color: #0369a1; font-size: 14px; margin: 15px 0 0 0; line-height: 1.5;">${message}</p>` : ''}
+      </div>
+    `;
+    }
+
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Appointment Confirmation</title>
+  <title>Confirmación de Cita</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
@@ -208,7 +397,7 @@ export class EmailService implements OnModuleInit {
           <!-- Header -->
           <tr>
             <td style="background-color: #2563eb; padding: 30px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">✓ Appointment Confirmed!</h1>
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">✓ ¡Cita Reservada!</h1>
             </td>
           </tr>
           
@@ -216,46 +405,52 @@ export class EmailService implements OnModuleInit {
           <tr>
             <td style="padding: 40px 30px;">
               <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                Dear <strong>${variables.patientName}</strong>,
+                Estimado/a <strong>${variables.patientName}</strong>,
               </p>
               
               <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                Your appointment has been successfully confirmed. Here are the details:
+                Tu cita ha sido reservada exitosamente. Aquí están los detalles:
               </p>
               
-              <!-- Appointment Details Table -->
+              <!-- Appointment Details -->
               <table width="100%" cellpadding="12" cellspacing="0" style="background-color: #f8f9fa; border-radius: 6px; margin-bottom: 30px;">
                 <tr>
                   <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Doctor:</td>
                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.doctorName}</td>
                 </tr>
                 <tr>
-                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Specialty:</td>
+                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Especialidad:</td>
                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.specialty}</td>
                 </tr>
                 <tr>
-                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Date:</td>
+                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Fecha:</td>
                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.date}</td>
                 </tr>
                 <tr>
-                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Time:</td>
+                  <td style="color: #666666; font-size: 14px; font-weight: bold; border-bottom: 1px solid #e0e0e0;">Hora:</td>
                   <td style="color: #333333; font-size: 14px; border-bottom: 1px solid #e0e0e0;">${variables.time}</td>
                 </tr>
                 <tr>
-                  <td style="color: #666666; font-size: 14px; font-weight: bold;">Location:</td>
+                  <td style="color: #666666; font-size: 14px; font-weight: bold;">Ubicación:</td>
                   <td style="color: #333333; font-size: 14px;">${variables.location}</td>
                 </tr>
               </table>
               
+              <!-- Expiration Warning (if applicable) -->
+              ${expirationWarning}
+              
+              <!-- Payment Section (if applicable) -->
+              ${paymentSection}
+              
               <!-- Important Note -->
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-                <p style="color: #92400e; font-size: 14px; margin: 0; line-height: 1.5;">
-                  <strong>⏰ Important:</strong> Please arrive 15 minutes early to complete any necessary paperwork.
+              <div style="background-color: #dbeafe; border-left: 4px solid #2563eb; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+                <p style="color: #1e40af; font-size: 14px; margin: 0; line-height: 1.5;">
+                  <strong>📋 Recuerda:</strong> Por favor llega 15 minutos antes para completar el registro.
                 </p>
               </div>
               
               <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0;">
-                If you need to cancel or reschedule, please contact us at least 24 hours in advance.
+                Si necesitas cancelar o reprogramar, por favor contáctanos con al menos 24 horas de anticipación.
               </p>
             </td>
           </tr>
@@ -264,8 +459,8 @@ export class EmailService implements OnModuleInit {
           <tr>
             <td style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;">
               <p style="color: #666666; font-size: 12px; margin: 0; line-height: 1.5;">
-                Clínica Perú - Quality Healthcare<br>
-                This is an automated message, please do not reply to this email.
+                Clínica Perú - Cuidando tu salud<br>
+                Este es un mensaje automático, por favor no respondas a este correo.
               </p>
             </td>
           </tr>
@@ -275,7 +470,7 @@ export class EmailService implements OnModuleInit {
   </table>
 </body>
 </html>
-    `.trim();
+  `.trim();
   }
 
   /**
