@@ -102,6 +102,19 @@ export class CreateDoctorDto {
   lastName: string;
 
   @ApiProperty({
+    description: 'Contraseña del doctor',
+    minLength: 8,
+    maxLength: 50,
+    example: 'Doctor123!',
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
+  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @MaxLength(50, { message: 'La contraseña no puede exceder 50 caracteres' })
+  @Transform(({ value }) => value?.trim())
+  password: string;
+
+  @ApiProperty({
     description: 'Correo electrónico del doctor',
     example: 'doctor@mail.com',
   })

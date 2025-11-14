@@ -144,8 +144,7 @@ export class DoctorsService {
     }
 
     // Crear usuario
-    const tempPassword = `TEMP_DOCTOR_${Date.now()}`;
-    const passwordHash = await this.hashingService.hash(tempPassword);
+    const passwordHash = await this.hashingService.hash(dto.password);
 
     const user = await this.prisma.user.create({
       data: {
@@ -260,6 +259,7 @@ export class DoctorsService {
         phone: doctor.user.phone,
         email: doctor.user.email,
         gender: doctor.user.gender,
+        dayOfBirth: doctor.user.dayOfBirth,
         profileImage: doctor.user.profileImage,
         isActive: doctor.user.isActive,
       },
@@ -689,6 +689,7 @@ export class DoctorsService {
             dni: doctor.user.dni,
             phone: doctor.user.phone,
             gender: doctor.user.gender,
+            dayOfBirth: doctor.user.dayOfBirth,
             profileImage: doctor.user.profileImage,
             isActive: doctor.user.isActive,
           },

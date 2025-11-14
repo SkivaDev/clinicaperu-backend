@@ -61,6 +61,7 @@ export class DoctorResponseDto {
     dni: string;
     phone?: string | null;
     gender: Gender;
+    dayOfBirth: Date;
     profileImage?: string | null;
     isActive: boolean;
   };
