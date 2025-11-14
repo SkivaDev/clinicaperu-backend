@@ -18,6 +18,7 @@
         "email",
         "s3",
         "availability",
-        "payments"
+        "payments",
+        "clinics"
     ]
 }
