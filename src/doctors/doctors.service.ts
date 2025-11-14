@@ -1,15 +1,16 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma, Role } from '@prisma/client';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { HashingService } from 'src/common/hashing/hashing.service';
-import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 import {
   PublicDoctorListDto,
   PublicDoctorDetailDto,
@@ -25,6 +26,16 @@ import {
   UpcomingAppointmentDto,
 } from './dto/doctor-statistics.dto';
 import { S3Service } from 'src/common/s3/s3.service';
+import { QueryDoctorDto, DoctorSortBy } from './dto/query-doctor.dto';
+import {
+  CanDeactivateDoctorResponseDto,
+  DoctorResponseDto,
+} from './dto/doctor-response.dto';
+import {
+  DoctorAlreadyExistsException,
+  DoctorCannotBeDeactivatedException,
+  DoctorNotFoundException,
+} from './exceptions/doctor.exceptions';
 
 @Injectable()
 export class DoctorsService {
@@ -34,86 +45,240 @@ export class DoctorsService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async createDoctor(dto: CreateUserDto & CreateDoctorDto) {
-    try {
-      // 1. Validar duplicados básicos (dni, email, cmp)
-      const existingUser = await this.prisma.user.findFirst({
-        where: { OR: [{ dni: dto.dni }, { email: dto.email }] },
-      });
-      if (existingUser) {
-        throw new ConflictException('Email o DNI ya están registrados');
-      }
+  // METODO DE CREAR DOCTOR ANTIGUO
+  // async createDoctor(dto: CreateUserDto & CreateDoctorDto) {
+  //   try {
+  //     // 1. Validar duplicados básicos (dni, email, cmp)
+  //     const existingUser = await this.prisma.user.findFirst({
+  //       where: { OR: [{ dni: dto.dni }, { email: dto.email }] },
+  //     });
+  //     if (existingUser) {
+  //       throw new ConflictException('Email o DNI ya están registrados');
+  //     }
 
-      const existingCmp = await this.prisma.doctor.findUnique({
-        where: { cmp: dto.cmp },
-      });
-      if (existingCmp) {
-        throw new ConflictException('CMP ya está registrado');
-      }
+  //     const existingCmp = await this.prisma.doctor.findUnique({
+  //       where: { cmp: dto.cmp },
+  //     });
+  //     if (existingCmp) {
+  //       throw new ConflictException('CMP ya está registrado');
+  //     }
 
-      // 2. Hashear password
-      const hashedPassword = await this.hashingService.hash(dto.password);
+  //     // 2. Hashear password
+  //     const hashedPassword = await this.hashingService.hash(dto.password);
 
-      // 3. Crear User + Doctor en una transacción
-      const result = await this.prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            dni: dto.dni,
-            email: dto.email,
-            passwordHash: hashedPassword,
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            dayOfBirth: new Date(dto.dayOfBirth),
-            phone: dto.phone,
-            gender: dto.gender,
-            role: 'DOCTOR',
-          },
-        });
+  //     // 3. Crear User + Doctor en una transacción
+  //     const result = await this.prisma.$transaction(async (tx) => {
+  //       const user = await tx.user.create({
+  //         data: {
+  //           dni: dto.dni,
+  //           email: dto.email,
+  //           passwordHash: hashedPassword,
+  //           firstName: dto.firstName,
+  //           lastName: dto.lastName,
+  //           dayOfBirth: new Date(dto.dayOfBirth),
+  //           phone: dto.phone,
+  //           gender: dto.gender,
+  //           role: 'DOCTOR',
+  //         },
+  //       });
 
-        const doctor = await tx.doctor.create({
-          data: {
-            cmp: dto.cmp,
-            isActive: dto.isActive,
-            yearsOfExperience: dto.yearsOfExperience,
-            consultationPrice: dto.consultationPrice,
-            clinic: { connect: { id: dto.clinicId } },
-            specialty: { connect: { id: dto.specialtyId } },
-            user: { connect: { id: user.id } },
-          },
-        });
+  //       const doctor = await tx.doctor.create({
+  //         data: {
+  //           cmp: dto.cmp,
+  //           isActive: dto.isActive,
+  //           yearsOfExperience: dto.yearsOfExperience,
+  //           consultationPrice: dto.consultationPrice,
+  //           clinic: { connect: { id: dto.clinicId } },
+  //           specialty: { connect: { id: dto.specialtyId } },
+  //           user: { connect: { id: user.id } },
+  //         },
+  //       });
 
-        //retornar sin el passwordHash
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { passwordHash: _, ...userWithoutPassword } = user;
-        return { ...doctor, user: userWithoutPassword };
-      });
+  //       //retornar sin el passwordHash
+  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //       const { passwordHash: _, ...userWithoutPassword } = user;
+  //       return { ...doctor, user: userWithoutPassword };
+  //     });
 
-      return result;
-    } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException('Error al registrar al doctor');
+  //     return result;
+  //   } catch (error) {
+  //     console.error(error);
+  //     throw new InternalServerErrorException('Error al registrar al doctor');
+  //   }
+  // }
+
+  // ===========================================================================
+  // CREAR DOCTOR (User + Doctor)
+  // ===========================================================================
+  async createDoctor(dto: CreateDoctorDto): Promise<DoctorResponseDto> {
+    // CMP único
+    const existingCMP = await this.prisma.doctor.findFirst({
+      where: { cmp: dto.cmp },
+    });
+
+    if (existingCMP) {
+      throw new DoctorAlreadyExistsException('cmp', dto.cmp);
     }
+
+    // Validar especialidad/clínica activas
+    const specialty = await this.prisma.specialty.findUnique({
+      where: { id: dto.specialtyId },
+    });
+
+    if (!specialty || !specialty.isActive) {
+      throw new HttpException(
+        'La especialidad no es válida o está inactiva',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const clinic = await this.prisma.clinic.findUnique({
+      where: { id: dto.clinicId },
+    });
+
+    if (!clinic || !clinic.isActive) {
+      throw new HttpException(
+        'La clínica no es válida o está inactiva',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Crear usuario
+    const tempPassword = `TEMP_DOCTOR_${Date.now()}`;
+    const passwordHash = await this.hashingService.hash(tempPassword);
+
+    const user = await this.prisma.user.create({
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        email: dto.email,
+        dni: dto.dni,
+        phone: dto.phone,
+        gender: dto.gender,
+        dayOfBirth: new Date(dto.dayOfBirth),
+        role: Role.DOCTOR,
+        isActive: dto.isActive ?? true,
+        passwordHash,
+      },
+    });
+
+    // Crear doctor
+    const doctor = await this.prisma.doctor.create({
+      data: {
+        cmp: dto.cmp,
+        consultationPrice: dto.consultationPrice,
+        yearsOfExperience: dto.yearsOfExperience,
+        specialtyId: dto.specialtyId,
+        clinicId: dto.clinicId,
+        userId: user.id,
+      },
+    });
+
+    return this.getDoctorById(doctor.id);
   }
 
-  async getDoctorDetail(id: string) {
+  // OBTENER DOCTOR POR ID ANTIGUO
+  // async getDoctorDetail(id: string) {
+  //   const doctor = await this.prisma.doctor.findUnique({
+  //     where: { id },
+  //     include: { user: true, clinic: true, specialty: true, schedules: true },
+  //   });
+  //   if (!doctor) throw new NotFoundException('Doctor not found');
+
+  //   // Excluir passwordHash del usuario
+  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //   const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+  //   // Generar URL prefirmada de S3 para la imagen de perfil
+  //   const profileImageUrl = await this.generateProfileImageUrl(
+  //     userWithoutPassword.profileImage,
+  //   );
+
+  //   return {
+  //     ...doctor,
+  //     user: { ...userWithoutPassword, profileImage: profileImageUrl },
+  //   };
+  // }
+
+  // ===========================================================================
+  // OBTENER DOCTOR POR ID
+  // ===========================================================================
+  async getDoctorById(id: string): Promise<DoctorResponseDto> {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id },
-      include: { user: true, clinic: true, specialty: true, schedules: true },
+      include: {
+        user: true,
+        specialty: true,
+        clinic: true,
+        schedules: true,
+        appointments: true,
+      },
     });
-    if (!doctor) throw new NotFoundException('Doctor not found');
 
-    // Excluir passwordHash del usuario
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, ...userWithoutPassword } = doctor.user;
+    if (!doctor) throw new DoctorNotFoundException(id);
 
-    // Generar URL prefirmada de S3 para la imagen de perfil
-    const profileImageUrl = await this.generateProfileImageUrl(
-      userWithoutPassword.profileImage,
-    );
+    const upcomingAppointments = await this.prisma.appointment.count({
+      where: {
+        doctorId: id,
+        slot: {
+          startAt: { gte: new Date() },
+        },
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+    });
+
+    const activeSchedules = await this.prisma.schedule.count({
+      where: { doctorId: id, isActive: true },
+    });
+
+    const availableSlots = await this.prisma.slot.count({
+      where: {
+        schedule: { doctorId: id },
+        isActive: true,
+        startAt: { gte: new Date() },
+        status: 'FREE',
+      },
+    });
 
     return {
-      ...doctor,
-      user: { ...userWithoutPassword, profileImage: profileImageUrl },
+      id: doctor.id,
+      cmp: doctor.cmp,
+      isActive: doctor.isActive,
+      yearsOfExperience: doctor.yearsOfExperience,
+      consultationPrice: doctor.consultationPrice,
+      rating: doctor.rating,
+      attendedAppointments: doctor.attendedAppointments,
+      attendedPatients: doctor.attendedPatients,
+      createdAt: doctor.createdAt,
+      updatedAt: doctor.updatedAt,
+
+      user: {
+        id: doctor.user.id,
+        firstName: doctor.user.firstName,
+        lastName: doctor.user.lastName,
+        dni: doctor.user.dni,
+        phone: doctor.user.phone,
+        email: doctor.user.email,
+        gender: doctor.user.gender,
+        profileImage: doctor.user.profileImage,
+        isActive: doctor.user.isActive,
+      },
+
+      specialty: {
+        id: doctor.specialty.id,
+        name: doctor.specialty.name,
+      },
+
+      clinic: {
+        id: doctor.clinic.id,
+        name: doctor.clinic.name,
+      },
+
+      schedulesCount: doctor.schedules.length,
+      appointmentsCount: doctor.appointments.length,
+      activeSchedulesCount: activeSchedules,
+      upcomingAppointmentsCount: upcomingAppointments,
+      availableSlotsCount: availableSlots,
     };
   }
 
@@ -145,112 +310,549 @@ export class DoctorsService {
   //   });
   // }
 
-  async updateDoctor(id: string, dto: UpdateUserDto & UpdateDoctorDto) {
-    // Verificar existencia
-    const doctor = await this.prisma.doctor.findUnique({
-      where: { id },
-      include: { user: true },
-    });
-    if (!doctor) {
-      throw new NotFoundException('Doctor no encontrado');
+  // TODO: Update Doctor METODO ANTIGUO
+  // async updateDoctor(id: string, dto: UpdateUserDto & UpdateDoctorDto) {
+  //   // Verificar existencia
+  //   const doctor = await this.prisma.doctor.findUnique({
+  //     where: { id },
+  //     include: { user: true },
+  //   });
+  //   if (!doctor) {
+  //     throw new NotFoundException('Doctor no encontrado');
+  //   }
+
+  //   // Si hay password, hashearlo
+  //   let passwordHash: string | undefined;
+  //   if (dto.password) {
+  //     passwordHash = await this.hashingService.hash(dto.password);
+  //   }
+
+  //   // Actualizar en transacción
+  //   const result = await this.prisma.$transaction(async (tx) => {
+  //     const updatedUser = await tx.user.update({
+  //       where: { id: doctor.userId },
+  //       data: {
+  //         dni: dto.dni,
+  //         email: dto.email,
+  //         firstName: dto.firstName,
+  //         lastName: dto.lastName,
+  //         phone: dto.phone,
+  //         gender: dto.gender,
+  //         dayOfBirth: dto.dayOfBirth ? new Date(dto.dayOfBirth) : undefined,
+  //         ...(passwordHash && { passwordHash }),
+  //       },
+  //     });
+
+  //     const updatedDoctor = await tx.doctor.update({
+  //       where: { id },
+  //       data: {
+  //         cmp: dto.cmp,
+  //         isActive: dto.isActive,
+  //         yearsOfExperience: dto.yearsOfExperience,
+  //         consultationPrice: dto.consultationPrice,
+  //         clinic: dto.clinicId ? { connect: { id: dto.clinicId } } : undefined,
+  //         specialty: dto.specialtyId
+  //           ? { connect: { id: dto.specialtyId } }
+  //           : undefined,
+  //       },
+  //     });
+
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //     const { passwordHash: _, ...userWithoutPassword } = updatedUser;
+  //     return { ...updatedDoctor, user: userWithoutPassword };
+  //   });
+
+  //   // Generar URL prefirmada de S3 para la imagen de perfil
+  //   const profileImageUrl = await this.generateProfileImageUrl(
+  //     result.user.profileImage,
+  //   );
+
+  //   return {
+  //     ...result,
+  //     user: { ...result.user, profileImage: profileImageUrl },
+  //   };
+  // }
+
+  // ===========================================================================
+  // ACTUALIZAR DOCTOR
+  // ===========================================================================
+  async updateDoctor(
+    id: string,
+    dto: UpdateDoctorDto,
+  ): Promise<DoctorResponseDto> {
+    const doctor = await this.getDoctorById(id);
+
+    // Validar CMP único si lo cambia
+    if (dto.cmp && dto.cmp !== doctor.cmp) {
+      const exists = await this.prisma.doctor.findFirst({
+        where: { cmp: dto.cmp },
+      });
+      if (exists) {
+        throw new DoctorAlreadyExistsException('cmp', dto.cmp);
+      }
     }
 
-    // Si hay password, hashearlo
-    let passwordHash: string | undefined;
-    if (dto.password) {
-      passwordHash = await this.hashingService.hash(dto.password);
-    }
-
-    // Actualizar en transacción
-    const result = await this.prisma.$transaction(async (tx) => {
-      const updatedUser = await tx.user.update({
-        where: { id: doctor.userId },
-        data: {
-          dni: dto.dni,
-          email: dto.email,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          phone: dto.phone,
-          gender: dto.gender,
-          dayOfBirth: dto.dayOfBirth ? new Date(dto.dayOfBirth) : undefined,
-          ...(passwordHash && { passwordHash }),
+    // Validar que NO cambie de especialidad si tiene citas futuras
+    if (dto.specialtyId && dto.specialtyId !== doctor.specialty.id) {
+      const futureAppointments = await this.prisma.appointment.count({
+        where: {
+          doctorId: id,
+          slot: { startAt: { gte: new Date() } },
+          status: { in: ['PENDING', 'CONFIRMED'] },
         },
       });
 
-      const updatedDoctor = await tx.doctor.update({
-        where: { id },
-        data: {
-          cmp: dto.cmp,
-          isActive: dto.isActive,
-          yearsOfExperience: dto.yearsOfExperience,
-          consultationPrice: dto.consultationPrice,
-          clinic: dto.clinicId ? { connect: { id: dto.clinicId } } : undefined,
-          specialty: dto.specialtyId
-            ? { connect: { id: dto.specialtyId } }
-            : undefined,
-        },
-      });
-
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash: _, ...userWithoutPassword } = updatedUser;
-      return { ...updatedDoctor, user: userWithoutPassword };
-    });
-
-    // Generar URL prefirmada de S3 para la imagen de perfil
-    const profileImageUrl = await this.generateProfileImageUrl(
-      result.user.profileImage,
-    );
-
-    return {
-      ...result,
-      user: { ...result.user, profileImage: profileImageUrl },
-    };
-  }
-
-  async deleteDoctor(id: string) {
-    await this.getDoctorIds(id);
-    const doctor = await this.prisma.doctor.delete({
-      where: { id },
-      include: { user: true },
-    });
-
-    // Excluir passwordHash del usuario
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, ...userWithoutPassword } = doctor.user;
-
-    // Generar URL prefirmada de S3 para la imagen de perfil
-    const profileImageUrl = await this.generateProfileImageUrl(
-      userWithoutPassword.profileImage,
-    );
-
-    return {
-      ...doctor,
-      user: { ...userWithoutPassword, profileImage: profileImageUrl },
-    };
-  }
-
-  async listDoctors() {
-    const doctors = await this.prisma.doctor.findMany({
-      include: { user: true, clinic: true, specialty: true },
-    });
-
-    // Excluir passwordHash de cada usuario y generar URLs de S3
-    return Promise.all(
-      doctors.map(async (doctor) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { passwordHash, ...userWithoutPassword } = doctor.user;
-
-        // Generar URL prefirmada de S3 para la imagen de perfil
-        const profileImageUrl = await this.generateProfileImageUrl(
-          userWithoutPassword.profileImage,
+      if (futureAppointments > 0) {
+        throw new HttpException(
+          'No se puede cambiar la especialidad porque tiene citas futuras programadas',
+          HttpStatus.BAD_REQUEST,
         );
+      }
+    }
 
+    // Validar especialidad y clínica activas
+    if (dto.specialtyId) {
+      const specialty = await this.prisma.specialty.findUnique({
+        where: { id: dto.specialtyId },
+      });
+      if (!specialty?.isActive)
+        throw new HttpException(
+          'La especialidad seleccionada no es válida o está inactiva',
+          HttpStatus.BAD_REQUEST,
+        );
+    }
+
+    if (dto.clinicId) {
+      const clinic = await this.prisma.clinic.findUnique({
+        where: { id: dto.clinicId },
+      });
+      if (!clinic?.isActive)
+        throw new HttpException(
+          'La clínica seleccionada no es válida o está inactiva',
+          HttpStatus.BAD_REQUEST,
+        );
+    }
+
+    // Actualizar doctor + usuario
+    await this.prisma.user.update({
+      where: { id: doctor.user.id },
+      data: {
+        ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+        ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+        ...(dto.dni !== undefined && { dni: dto.dni }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+        ...(dto.email !== undefined && { email: dto.email }),
+        ...(dto.dayOfBirth !== undefined && {
+          dayOfBirth: new Date(dto.dayOfBirth),
+        }),
+      },
+    });
+
+    await this.prisma.doctor.update({
+      where: { id },
+      data: dto,
+    });
+
+    return this.getDoctorById(id);
+  }
+
+  // async deleteDoctor(id: string) {
+  //   await this.getDoctorIds(id);
+  //   const doctor = await this.prisma.doctor.delete({
+  //     where: { id },
+  //     include: { user: true },
+  //   });
+
+  //   // Excluir passwordHash del usuario
+  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //   const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+  //   // Generar URL prefirmada de S3 para la imagen de perfil
+  //   const profileImageUrl = await this.generateProfileImageUrl(
+  //     userWithoutPassword.profileImage,
+  //   );
+
+  //   return {
+  //     ...doctor,
+  //     user: { ...userWithoutPassword, profileImage: profileImageUrl },
+  //   };
+  // }
+
+  // async listDoctors() {
+  //   const doctors = await this.prisma.doctor.findMany({
+  //     include: { user: true, clinic: true, specialty: true },
+  //   });
+
+  //   // Excluir passwordHash de cada usuario y generar URLs de S3
+  //   return Promise.all(
+  //     doctors.map(async (doctor) => {
+  //       // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //       const { passwordHash, ...userWithoutPassword } = doctor.user;
+
+  //       // Generar URL prefirmada de S3 para la imagen de perfil
+  //       const profileImageUrl = await this.generateProfileImageUrl(
+  //         userWithoutPassword.profileImage,
+  //       );
+
+  //       return {
+  //         ...doctor,
+  //         user: { ...userWithoutPassword, profileImage: profileImageUrl },
+  //       };
+  //     }),
+  //   );
+  // }
+
+  /**
+   * Listar doctores con filtros avanzados, paginación y estadísticas
+   */
+  async listDoctors(query?: QueryDoctorDto): Promise<{
+    data: DoctorResponseDto[];
+    stats: any;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  }> {
+    const {
+      search,
+      cmp,
+      specialtyId,
+      clinicId,
+      isActive,
+      sortBy = 'lastName',
+      sortOrder = 'asc',
+      page = 1,
+      limit = 10,
+    } = query || {};
+
+    // -------------------------------------------------------
+    // 1. Construir filtros
+    // -------------------------------------------------------
+    const where: Prisma.DoctorWhereInput = {};
+
+    if (cmp) {
+      where.cmp = Number(cmp);
+    }
+
+    if (specialtyId) {
+      where.specialtyId = specialtyId;
+    }
+
+    if (clinicId) {
+      where.clinicId = clinicId;
+    }
+
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    }
+
+    if (search) {
+      const orFilters: Prisma.DoctorWhereInput[] = [
+        {
+          user: {
+            firstName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          user: {
+            lastName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        },
+      ];
+
+      const searchAsNumber = Number(search);
+      if (!Number.isNaN(searchAsNumber)) {
+        orFilters.push({
+          cmp: {
+            equals: searchAsNumber,
+          },
+        });
+      }
+
+      where.OR = orFilters;
+    }
+
+    // -------------------------------------------------------
+    // 2. Contar total
+    // -------------------------------------------------------
+    const total = await this.prisma.doctor.count({ where });
+
+    const skip = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
+
+    // -------------------------------------------------------
+    // 3. Obtener doctores + _count
+    // -------------------------------------------------------
+    let orderBy: Prisma.DoctorOrderByWithRelationInput;
+
+    if (sortBy === DoctorSortBy.FIRST_NAME) {
+      orderBy = { user: { firstName: sortOrder } };
+    } else if (sortBy === DoctorSortBy.LAST_NAME) {
+      orderBy = { user: { lastName: sortOrder } };
+    } else {
+      orderBy = {
+        [sortBy]: sortOrder,
+      } as Prisma.DoctorOrderByWithRelationInput;
+    }
+
+    const doctors = await this.prisma.doctor.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy,
+      include: {
+        specialty: true,
+        clinic: true,
+        user: true,
+        _count: {
+          select: {
+            schedules: true,
+            appointments: true,
+          },
+        },
+      },
+    });
+
+    // -------------------------------------------------------
+    // 4. Calcular datos derivados (Asíncrono por cada doctor)
+    // -------------------------------------------------------
+    const data = await Promise.all(
+      doctors.map(async (doctor) => {
+        // Citas futuras activas
+        const upcomingAppointments = await this.prisma.appointment.count({
+          where: {
+            doctorId: doctor.id,
+            slot: {
+              startAt: {
+                gte: new Date(),
+              },
+            },
+            status: { in: ['PENDING', 'CONFIRMED'] },
+          },
+        });
+
+        // Slots disponibles FREE
+        const availableSlots = await this.prisma.slot.count({
+          where: {
+            schedule: { doctorId: doctor.id },
+            startAt: { gte: new Date() },
+            status: 'FREE',
+            isActive: true,
+          },
+        });
+
+        // Horarios activos
+        const activeSchedules = await this.prisma.schedule.count({
+          where: {
+            doctorId: doctor.id,
+            isActive: true,
+          },
+        });
+
+        // Construcción final
         return {
-          ...doctor,
-          user: { ...userWithoutPassword, profileImage: profileImageUrl },
+          id: doctor.id,
+          cmp: doctor.cmp,
+          isActive: doctor.isActive,
+          yearsOfExperience: doctor.yearsOfExperience,
+          consultationPrice: doctor.consultationPrice,
+          attendedAppointments: doctor.attendedAppointments,
+          attendedPatients: doctor.attendedPatients,
+          rating: doctor.rating,
+          createdAt: doctor.createdAt,
+          updatedAt: doctor.updatedAt,
+
+          // Relaciones
+          specialty: {
+            id: doctor.specialty.id,
+            name: doctor.specialty.name,
+          },
+          clinic: {
+            id: doctor.clinic.id,
+            name: doctor.clinic.name,
+          },
+          user: {
+            id: doctor.user.id,
+            firstName: doctor.user.firstName,
+            lastName: doctor.user.lastName,
+            email: doctor.user.email,
+            dni: doctor.user.dni,
+            phone: doctor.user.phone,
+            gender: doctor.user.gender,
+            profileImage: doctor.user.profileImage,
+            isActive: doctor.user.isActive,
+          },
+
+          // Conteos adicionales
+          schedulesCount: doctor._count.schedules,
+          appointmentsCount: doctor._count.appointments,
+          activeSchedulesCount: activeSchedules,
+          upcomingAppointmentsCount: upcomingAppointments,
+          availableSlotsCount: availableSlots,
         };
       }),
     );
+
+    // -------------------------------------------------------
+    // 5. Estadísticas globales del módulo Doctor
+    // -------------------------------------------------------
+    const totalDoctors = await this.prisma.doctor.count();
+    const activeDoctors = await this.prisma.doctor.count({
+      where: { isActive: true },
+    });
+    const inactiveDoctors = totalDoctors - activeDoctors;
+    const totalPatients = await this.prisma.appointment.count({
+      where: {
+        doctor: {
+          user: {
+            isActive: true,
+          },
+        },
+      },
+    });
+    const totalAppointments = await this.prisma.appointment.count({
+      where: {
+        status: {
+          in: ['PENDING', 'CONFIRMED', 'ATTENDED'],
+        },
+      },
+    });
+
+    return {
+      data,
+      stats: {
+        totalDoctors,
+        activeDoctors,
+        inactiveDoctors,
+        totalPatients,
+        totalAppointments,
+      },
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  // ===========================================================================
+  // CAN DEACTIVATE (UI)
+  // ===========================================================================
+  async canDeactivate(id: string): Promise<CanDeactivateDoctorResponseDto> {
+    await this.getDoctorById(id);
+
+    const reasons: string[] = [];
+    const warnings: string[] = [];
+
+    const upcomingAppointments = await this.prisma.appointment.count({
+      where: {
+        doctorId: id,
+        slot: { startAt: { gte: new Date() } },
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+    });
+
+    if (upcomingAppointments > 0) {
+      reasons.push(`Tiene ${upcomingAppointments} cita(s) futura(s).`);
+    }
+
+    const activeSchedules = await this.prisma.schedule.count({
+      where: { doctorId: id, isActive: true },
+    });
+
+    if (activeSchedules > 0) {
+      warnings.push(`Se desactivarán ${activeSchedules} horario(s) activos.`);
+    }
+
+    const activeSlots = await this.prisma.slot.count({
+      where: {
+        schedule: { doctorId: id },
+        isActive: true,
+        startAt: { gte: new Date() },
+        status: { in: ['FREE', 'HELD', 'BOOKED'] },
+      },
+    });
+
+    if (activeSlots > 0) {
+      reasons.push(
+        `Tiene ${activeSlots} slots futuros en FREE / HELD / BOOKED.`,
+      );
+    }
+
+    return {
+      canDeactivate: reasons.length === 0,
+      reasons,
+      warnings,
+      metadata: {
+        upcomingAppointments,
+        activeSchedules,
+        availableSlots: activeSlots,
+      },
+    };
+  }
+
+  // ===========================================================================
+  // 🔒 DESACTIVAR DOCTOR (estricto)
+  // ===========================================================================
+  async deactivateDoctor(id: string): Promise<DoctorResponseDto> {
+    const doctor = await this.getDoctorById(id);
+
+    if (!doctor.isActive) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'El doctor ya está desactivado',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const validation = await this.canDeactivate(id);
+
+    if (!validation.canDeactivate) {
+      throw new DoctorCannotBeDeactivatedException(
+        validation.reasons,
+        validation.metadata,
+      );
+    }
+
+    // Desactivar doctor + usuario asociado
+    await this.prisma.$transaction([
+      this.prisma.doctor.update({
+        where: { id },
+        data: { isActive: false },
+      }),
+      this.prisma.user.update({
+        where: { id: doctor.user.id },
+        data: { isActive: false },
+      }),
+      this.prisma.schedule.updateMany({
+        where: { doctorId: id },
+        data: { isActive: false },
+      }),
+      this.prisma.slot.updateMany({
+        where: {
+          schedule: { doctorId: id },
+          startAt: { gte: new Date() },
+        },
+        data: { isActive: false },
+      }),
+    ]);
+
+    return this.getDoctorById(id);
   }
 
   async listDoctorsByClinic(clinicId: string) {
