@@ -70,7 +70,8 @@ export class BookingResponseDto {
   })
   doctor: {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     specialty: string;
   };
 

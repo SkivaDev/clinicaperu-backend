@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotStatus } from '@prisma/client';
 import {
@@ -127,7 +127,7 @@ export class AvailabilityService {
     });
 
     if (!doctor) {
-      throw new Error(`Doctor with ID ${filters.doctorId} not found`);
+      throw new NotFoundException(`Doctor with ID ${filters.doctorId} not found`);
     }
 
     // Extraer todos los slots y ordenarlos

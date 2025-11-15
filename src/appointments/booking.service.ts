@@ -31,9 +31,10 @@ export class BookingService {
    * Garantiza que solo un paciente pueda reservar un slot específico
    * Maneja concurrencia con FOR UPDATE y retry en deadlocks
    *
-   * Estado inicial:
-   * - PATIENT: CONFIRMED (auto-confirmación)
-   * - ADMIN: CONFIRMED (auto-confirmación)
+   * Estado inicial (HU-030 - Pago):
+   * - PATIENT: PENDING (requiere pago para confirmar)
+   * - ADMIN: PENDING (requiere pago para confirmar)
+   * - Las citas pasan a CONFIRMED solo después del pago exitoso
    */
   async bookSlot(
     userId: string,
@@ -46,9 +47,9 @@ export class BookingService {
       `${logContext} Starting atomic booking for user ${userId} (${userRole}), slot ${bookingDto.slotId}`,
     );
 
-    // Paciente o Admin crean citas CONFIRMED automáticamente
-    const initialStatus = AppointmentStatus.CONFIRMED;
-    const shouldSetConfirmedAt = true;
+    // HU-030: Todas las citas inician en PENDING - requieren pago
+    const initialStatus = AppointmentStatus.PENDING;
+    const shouldSetConfirmedAt = false;
 
     let attempt = 0;
 
@@ -352,7 +353,8 @@ export class BookingService {
               createdAt: appointment.createdAt,
               doctor: {
                 id: doctor.id,
-                name: `${doctor.user.firstName} ${doctor.user.lastName}`,
+                firstName: doctor.user.firstName,
+                lastName: doctor.user.lastName,
                 specialty: doctor.specialty.name,
               },
               clinic: {
@@ -445,7 +447,7 @@ export class BookingService {
         this.logger.log(
           `${logContext} Cash payment email enqueued for ${emailData.patientEmail}`,
         );
-      } else if (emailData.paymentMethod === 'CARD') {
+      } else if (emailData.paymentMethod === 'SIMULATED_CARD') {
         // Email para pago con tarjeta
         if (!emailData.expiresAt) {
           this.logger.warn(
