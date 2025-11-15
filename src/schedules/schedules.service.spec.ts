@@ -49,7 +49,8 @@ describe('SchedulesService', () => {
 
     service = module.get<SchedulesService>(SchedulesService);
     prismaService = module.get<PrismaService>(PrismaService);
-    slotGeneratorService = module.get<SlotGeneratorService>(SlotGeneratorService);
+    slotGeneratorService =
+      module.get<SlotGeneratorService>(SlotGeneratorService);
   });
 
   it('should be defined', () => {
@@ -160,8 +161,12 @@ describe('SchedulesService', () => {
 
       mockPrismaService.doctor.findUnique.mockResolvedValue({ id: doctorId });
       mockPrismaService.$transaction = mockTransaction;
-      mockSlotGeneratorService.cleanupFutureFreeSlotsForDoctor.mockResolvedValue(5);
-      mockSlotGeneratorService.generateSlotsForActiveSchedules.mockResolvedValue([]);
+      mockSlotGeneratorService.cleanupFutureFreeSlotsForDoctor.mockResolvedValue(
+        5,
+      );
+      mockSlotGeneratorService.generateSlotsForActiveSchedules.mockResolvedValue(
+        [],
+      );
 
       const result = await service.updateSchedules(doctorId, schedules);
 

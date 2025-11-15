@@ -234,7 +234,7 @@ export class CalendarService {
     view: string,
   ): { start: Date; end: Date } {
     const startDate = new Date(start);
-    let endDate = new Date(startDate);
+    const endDate = new Date(startDate);
 
     switch (view) {
       case 'day':

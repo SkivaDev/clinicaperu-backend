@@ -8,7 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // lo comente porque el bullboard no me funcionaba / Configurar Express para manejar UTF-8 correctamente 
+  // lo comente porque el bullboard no me funcionaba / Configurar Express para manejar UTF-8 correctamente
   // app.use((req: Request, res: Response, next: NextFunction) => {
   //   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   //   next();

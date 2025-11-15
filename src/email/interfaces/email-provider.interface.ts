@@ -95,4 +95,3 @@ export enum EmailProviderType {
   SENDGRID = 'sendgrid', // Future extension
   SES = 'ses', // Future extension
 }
-

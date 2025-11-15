@@ -1,4 +1,12 @@
-import { Controller, Get, Put, HttpStatus, Query, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  HttpStatus,
+  Query,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -16,7 +24,10 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { UserSearchResultDto } from './dto/user-search-result.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { PatientProfileDto, DoctorProfileDto } from './dto/profile-response.dto';
+import {
+  PatientProfileDto,
+  DoctorProfileDto,
+} from './dto/profile-response.dto';
 import { ResponseDto } from 'src/common/dto/response.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';

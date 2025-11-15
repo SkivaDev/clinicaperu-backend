@@ -1,4 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import type { TransformFnParams } from 'class-transformer';
 import {
   IsEmail,
   IsString,
@@ -14,6 +16,24 @@ import { Gender } from '@prisma/client';
 /**
  * DTO para crear un nuevo paciente desde el panel de administración
  */
+const toTrimmedString = ({ value }: TransformFnParams): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  return undefined;
+};
+
+const toNormalizedEmail = ({
+  value,
+}: TransformFnParams): string | undefined => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+  return undefined;
+};
+
 export class CreatePatientDto {
   @ApiProperty({
     description: 'DNI del paciente (8 dígitos)',
@@ -25,6 +45,7 @@ export class CreatePatientDto {
   @MinLength(8)
   @MaxLength(8)
   @Matches(/^\d{8}$/, { message: 'DNI must be exactly 8 digits' })
+  @Transform(toTrimmedString)
   dni: string;
 
   @ApiProperty({
@@ -32,6 +53,7 @@ export class CreatePatientDto {
     example: 'juan.perez@example.com',
   })
   @IsEmail()
+  @Transform(toNormalizedEmail)
   email: string;
 
   @ApiProperty({
@@ -41,6 +63,7 @@ export class CreatePatientDto {
   })
   @IsString()
   @MinLength(8)
+  @Transform(toTrimmedString)
   password: string;
 
   @ApiProperty({
@@ -49,6 +72,7 @@ export class CreatePatientDto {
   })
   @IsString()
   @MinLength(2)
+  @Transform(toTrimmedString)
   firstName: string;
 
   @ApiProperty({
@@ -57,6 +81,7 @@ export class CreatePatientDto {
   })
   @IsString()
   @MinLength(2)
+  @Transform(toTrimmedString)
   lastName: string;
 
   @ApiProperty({
@@ -66,13 +91,13 @@ export class CreatePatientDto {
   @IsDateString()
   dayOfBirth: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Teléfono del paciente',
     example: '+51987654321',
-    required: false,
   })
   @IsOptional()
   @IsString()
+  @Transform(toTrimmedString)
   phone?: string;
 
   @ApiProperty({
@@ -83,12 +108,12 @@ export class CreatePatientDto {
   @IsEnum(Gender)
   gender: Gender;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'URL de la imagen de perfil',
     example: 'https://example.com/profile.jpg',
-    required: false,
   })
   @IsOptional()
   @IsString()
+  @Transform(toTrimmedString)
   profileImage?: string;
 }

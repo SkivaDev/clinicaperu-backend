@@ -46,11 +46,7 @@ export class PaymentsService {
     dto: MarkCashPaidDto,
     adminUserId: string,
   ) {
-    return await this.processor.markCashPaid(
-      paymentId,
-      adminUserId,
-      dto.notes,
-    );
+    return await this.processor.markCashPaid(paymentId, adminUserId, dto.notes);
   }
 
   /**

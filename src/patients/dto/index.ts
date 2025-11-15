@@ -10,3 +10,4 @@ export {
 } from './admin-patient-detail.dto';
 export { CreatePatientDto } from './create-patient.dto';
 export { UpdatePatientDto } from './update-patient.dto';
+export { CanDeactivatePatientResponseDto } from './can-deactivate-patient-response.dto';

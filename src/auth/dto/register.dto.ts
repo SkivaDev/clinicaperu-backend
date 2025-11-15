@@ -15,7 +15,7 @@ export class RegisterDto {
     description: 'DNI del usuario',
     example: '12345678',
     minLength: 8,
-    maxLength: 8
+    maxLength: 8,
   })
   @IsString()
   @IsNotEmpty()
@@ -25,7 +25,7 @@ export class RegisterDto {
   @ApiProperty({
     description: 'Correo electrónico del usuario',
     example: 'usuario@example.com',
-    format: 'email'
+    format: 'email',
   })
   @IsEmail()
   @IsNotEmpty()
@@ -33,7 +33,7 @@ export class RegisterDto {
 
   @ApiProperty({
     description: 'Nombre del usuario',
-    example: 'Juan'
+    example: 'Juan',
   })
   @IsString()
   @IsNotEmpty()
@@ -41,7 +41,7 @@ export class RegisterDto {
 
   @ApiProperty({
     description: 'Apellido del usuario',
-    example: 'Pérez'
+    example: 'Pérez',
   })
   @IsString()
   @IsNotEmpty()
@@ -50,7 +50,7 @@ export class RegisterDto {
   @ApiProperty({
     description: 'Contraseña del usuario',
     example: 'MiContraseña123!',
-    minLength: 8
+    minLength: 8,
   })
   @IsString()
   @IsNotEmpty()
@@ -59,7 +59,7 @@ export class RegisterDto {
   @ApiProperty({
     description: 'Fecha de nacimiento en formato ISO 8601',
     example: '1990-01-15T00:00:00Z',
-    format: 'date-time'
+    format: 'date-time',
   })
   @IsDateString()
   @IsNotEmpty()
@@ -67,7 +67,7 @@ export class RegisterDto {
 
   @ApiPropertyOptional({
     description: 'Número de teléfono del usuario',
-    example: '+51987654321'
+    example: '+51987654321',
   })
   @IsOptional()
   @IsString()
@@ -76,14 +76,14 @@ export class RegisterDto {
   @ApiProperty({
     description: 'Género del usuario',
     enum: Gender,
-    example: Gender.MALE
+    example: Gender.MALE,
   })
   @IsEnum(Gender)
   gender: Gender;
 
   @ApiPropertyOptional({
     description: 'URL de la imagen de perfil del usuario',
-    example: 'https://example.com/profile.jpg'
+    example: 'https://example.com/profile.jpg',
   })
   @IsString()
   @IsOptional()

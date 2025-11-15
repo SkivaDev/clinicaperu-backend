@@ -15,4 +15,3 @@ export class CalendarEventDto {
   reason?: string;
   notes?: string;
 }
-

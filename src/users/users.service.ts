@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { User, Role } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -6,7 +12,10 @@ import { HashingService } from 'src/common/hashing/hashing.service';
 import { UserSearchResultDto } from './dto/user-search-result.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { PatientProfileDto, DoctorProfileDto } from './dto/profile-response.dto';
+import {
+  PatientProfileDto,
+  DoctorProfileDto,
+} from './dto/profile-response.dto';
 import { S3Service } from 'src/common/s3/s3.service';
 
 @Injectable()
@@ -291,12 +300,16 @@ export class UsersService {
   ): Promise<{ message: string }> {
     // Validar que newPassword y confirmPassword coincidan
     if (dto.newPassword !== dto.confirmPassword) {
-      throw new BadRequestException('New password and confirmation do not match');
+      throw new BadRequestException(
+        'New password and confirmation do not match',
+      );
     }
 
     // Validar que newPassword sea diferente de currentPassword
     if (dto.newPassword === dto.currentPassword) {
-      throw new BadRequestException('New password must be different from current password');
+      throw new BadRequestException(
+        'New password must be different from current password',
+      );
     }
 
     // Obtener usuario con passwordHash

@@ -45,7 +45,9 @@ export class MailhogEmailProvider implements IEmailProvider {
       logger: process.env.NODE_ENV === 'development',
     });
 
-    this.logger.log(`✅ MailHog email transporter initialized: ${this.config.smtpHost}:${this.config.smtpPort}`);
+    this.logger.log(
+      `✅ MailHog email transporter initialized: ${this.config.smtpHost}:${this.config.smtpPort}`,
+    );
   }
 
   async sendEmail(
@@ -55,7 +57,8 @@ export class MailhogEmailProvider implements IEmailProvider {
     from?: string,
   ): Promise<EmailSendResult> {
     try {
-      const fromEmail = from || this.config.fromEmail || 'noreply@clinicaperu.local';
+      const fromEmail =
+        from || this.config.fromEmail || 'noreply@clinicaperu.local';
 
       this.logger.debug(`Sending email via MailHog: ${subject} to ${to}`);
 
@@ -80,10 +83,15 @@ export class MailhogEmailProvider implements IEmailProvider {
         },
       };
 
-      this.logger.log(`✅ Email sent via MailHog: ${subject} to ${to} (ID: ${sendResult.messageId})`);
+      this.logger.log(
+        `✅ Email sent via MailHog: ${subject} to ${to} (ID: ${sendResult.messageId})`,
+      );
       return sendResult;
     } catch (error) {
-      this.logger.error(`❌ MailHog email failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `❌ MailHog email failed: ${error.message}`,
+        error.stack,
+      );
       throw new Error(`MailHog email delivery failed: ${error.message}`);
     }
   }
@@ -104,7 +112,9 @@ export class MailhogEmailProvider implements IEmailProvider {
       <p><em>This is a template email sent via MailHog for testing purposes.</em></p>
     `;
 
-    this.logger.warn(`⚠️ Template emails are simplified in MailHog provider: ${templateId}`);
+    this.logger.warn(
+      `⚠️ Template emails are simplified in MailHog provider: ${templateId}`,
+    );
 
     return this.sendEmail(to, subject, html, from);
   }

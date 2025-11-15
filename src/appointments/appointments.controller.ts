@@ -243,8 +243,7 @@ export class AppointmentsController {
     type: ResponseDto<AppointmentResponseDto>,
   })
   @ApiBadRequestResponse({
-    description:
-      'La cita no está en estado PENDING o no se puede confirmar',
+    description: 'La cita no está en estado PENDING o no se puede confirmar',
   })
   @ApiForbiddenResponse({
     description: 'Solo el paciente propietario puede confirmar esta cita',

@@ -1,4 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import type { TransformFnParams } from 'class-transformer';
 import {
   IsEmail,
   IsString,
@@ -7,83 +9,110 @@ import {
   IsOptional,
   IsBoolean,
   MinLength,
+  MaxLength,
+  Matches,
 } from 'class-validator';
 import { Gender } from '@prisma/client';
 
 /**
  * DTO para actualizar un paciente desde el panel de administración
  */
+const toTrimmedString = (params: TransformFnParams): string | undefined => {
+  if (typeof params.value !== 'string') {
+    return undefined;
+  }
+  const trimmed = params.value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const toNormalizedEmail = (params: TransformFnParams): string | undefined => {
+  if (typeof params.value !== 'string') {
+    return undefined;
+  }
+  const normalized = params.value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 export class UpdatePatientDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
+    description: 'DNI del paciente (8 dígitos)',
+    example: '12345678',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(8)
+  @Matches(/^\d{8}$/, { message: 'DNI must be exactly 8 digits' })
+  @Transform(toTrimmedString)
+  dni?: string;
+
+  @ApiPropertyOptional({
     description: 'Email del paciente',
     example: 'juan.perez@example.com',
-    required: false,
   })
   @IsOptional()
   @IsEmail()
+  @Transform(toNormalizedEmail)
   email?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Nombre del paciente',
     example: 'Juan',
-    required: false,
   })
   @IsOptional()
   @IsString()
   @MinLength(2)
+  @Transform(toTrimmedString)
   firstName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Apellido del paciente',
     example: 'Pérez García',
-    required: false,
   })
   @IsOptional()
   @IsString()
   @MinLength(2)
+  @Transform(toTrimmedString)
   lastName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Fecha de nacimiento (ISO 8601)',
     example: '1990-05-15',
-    required: false,
   })
   @IsOptional()
   @IsDateString()
   dayOfBirth?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Teléfono del paciente',
     example: '+51987654321',
-    required: false,
   })
   @IsOptional()
   @IsString()
+  @Transform(toTrimmedString)
   phone?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Género del paciente',
     enum: Gender,
     example: Gender.MALE,
-    required: false,
   })
   @IsOptional()
   @IsEnum(Gender)
   gender?: Gender;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'URL de la imagen de perfil',
     example: 'https://example.com/profile.jpg',
-    required: false,
   })
   @IsOptional()
   @IsString()
+  @Transform(toTrimmedString)
   profileImage?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Estado activo del paciente',
     example: true,
-    required: false,
   })
   @IsOptional()
   @IsBoolean()

@@ -14,11 +14,11 @@ async function main() {
       passwordHash: adminPassword,
       dni: '12345678',
       firstName: 'Admin',
-      lastName: 'Admin Admin',
+      lastName: 'GOD',
       dayOfBirth: new Date('1990-01-01'),
       gender: 'MALE',
       role: 'ADMIN',
-      profileImage: 'https://www.flaticon.com/free-icon/admin_9703596',
+      profileImage: 'profile-images/default-admins/admin.webp',
     },
   });
 

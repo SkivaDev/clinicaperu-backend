@@ -84,7 +84,9 @@ export class SlotGeneratorService {
       result.slotsCreated = createResult.count;
       result.slotsSkipped = slots.length - createResult.count;
     } catch (error) {
-      result.errors.push(`Error generating slots for schedule ${schedule.id}: ${error.message}`);
+      result.errors.push(
+        `Error generating slots for schedule ${schedule.id}: ${error.message}`,
+      );
     }
 
     return result;
@@ -211,7 +213,10 @@ export class SlotGeneratorService {
   private isDateWithinEffectivePeriod(date: Date, schedule: any): boolean {
     const targetDate = startOfDay(date);
 
-    if (schedule.effectiveFrom && isBefore(targetDate, schedule.effectiveFrom)) {
+    if (
+      schedule.effectiveFrom &&
+      isBefore(targetDate, schedule.effectiveFrom)
+    ) {
       return false;
     }
 
@@ -280,7 +285,8 @@ export class SlotGeneratorService {
   private isSlotAvailable(slot: any, unavailabilities: any[]): boolean {
     return !unavailabilities.some(
       (unavailability) =>
-        slot.startAt < unavailability.endAt && slot.endAt > unavailability.startAt,
+        slot.startAt < unavailability.endAt &&
+        slot.endAt > unavailability.startAt,
     );
   }
 

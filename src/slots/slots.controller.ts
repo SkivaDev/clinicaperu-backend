@@ -92,19 +92,19 @@ export class SlotsController {
   }
 
   @Get('statistics/doctor/:doctorId')
-  async getSlotStatistics(
-    @Param('doctorId') doctorId: string,
-  ): Promise<ResponseDto<{
-    totalSlots: number;
-    activeSlots: number;
-    inactiveSlots: number;
-    freeSlots: number;
-    bookedSlots: number;
-    heldSlots: number;
-    blockedSlots: number;
-    futureSlots: number;
-    pastSlots: number;
-  }>> {
+  async getSlotStatistics(@Param('doctorId') doctorId: string): Promise<
+    ResponseDto<{
+      totalSlots: number;
+      activeSlots: number;
+      inactiveSlots: number;
+      freeSlots: number;
+      bookedSlots: number;
+      heldSlots: number;
+      blockedSlots: number;
+      futureSlots: number;
+      pastSlots: number;
+    }>
+  > {
     const statistics = await this.slotsService.getSlotStatistics(doctorId);
     return {
       statusCode: HttpStatus.OK,

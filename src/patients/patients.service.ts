@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MyDoctorDto } from './dto/my-doctor.dto';
 import {
@@ -15,7 +10,51 @@ import {
 } from './dto';
 import { HashingService } from 'src/common/hashing/hashing.service';
 import { S3Service } from 'src/common/s3/s3.service';
-import { Role } from '@prisma/client';
+import { AppointmentStatus, Gender, Prisma, Role } from '@prisma/client';
+import {
+  PatientAlreadyExistsException,
+  PatientCannotBeDeactivatedException,
+  PatientNotFoundException,
+} from './exceptions/patient.exceptions';
+
+export interface CanDeactivatePatientResponse {
+  canDeactivate: boolean;
+  reasons: string[];
+  warnings: string[];
+  metadata: {
+    futureAppointments: number;
+  };
+}
+
+type NormalizedPatientIdentifiers = {
+  dni?: string;
+  email?: string;
+};
+
+type NormalizedCreatePatientPayload = {
+  dni: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  gender: Gender;
+  dayOfBirth: Date;
+  profileImage: string | null;
+  isActive: boolean;
+};
+
+type NormalizedUpdatePatientPayload = NormalizedPatientIdentifiers & {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  gender?: Gender;
+  dayOfBirth?: Date;
+  profileImage?: string | null;
+  isActive?: boolean;
+};
+
+const MIN_PATIENT_AGE = 18;
 
 @Injectable()
 export class PatientsService {
@@ -138,10 +177,10 @@ export class PatientsService {
         lastName: string;
         email: string;
         phone: string | null;
-        gender: string;
+        gender: Gender;
         dayOfBirth: Date;
         profileImage: string | null;
-        role: string;
+        role: Role;
         isActive: boolean;
         createdAt: Date;
         totalAppointments: bigint;
@@ -186,9 +225,9 @@ export class PatientsService {
     const result: AdminPatientListDto[] = await Promise.all(
       patients.map(async (patient) => {
         const age = this.calculateAge(patient.dayOfBirth);
-        const profileImageUrl = await this.generateProfileImageUrl(
-          patient.profileImage,
-        );
+        // const profileImageUrl = await this.generateProfileImageUrl(
+        //   patient.profileImage,
+        // );
         return {
           id: patient.id,
           dni: patient.dni,
@@ -197,11 +236,11 @@ export class PatientsService {
           fullName: `${patient.firstName} ${patient.lastName}`,
           email: patient.email,
           phone: patient.phone,
-          gender: patient.gender as any,
+          gender: patient.gender,
           dayOfBirth: patient.dayOfBirth,
           age,
-          profileImage: profileImageUrl,
-          role: patient.role as any,
+          profileImage: patient.profileImage,
+          role: patient.role,
           isActive: patient.isActive,
           createdAt: patient.createdAt,
           statistics: {
@@ -246,12 +285,8 @@ export class PatientsService {
       },
     });
 
-    if (!patient) {
-      throw new NotFoundException(`Patient with ID ${patientId} not found`);
-    }
-
-    if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
+    if (!patient || patient.role !== Role.PATIENT) {
+      throw new PatientNotFoundException(patientId);
     }
 
     // Calcular estadísticas
@@ -320,40 +355,29 @@ export class PatientsService {
   async createPatient(dto: CreatePatientDto): Promise<AdminPatientDetailDto> {
     this.logger.log(`Creating new patient with DNI: ${dto.dni}`);
 
-    // Verificar si el DNI ya existe
-    const existingDni = await this.prisma.user.findUnique({
-      where: { dni: dto.dni },
+    const normalized = this.normalizeCreatePayload(dto);
+
+    await this.ensureUniqueIdentifiers({
+      dni: normalized.dni,
+      email: normalized.email,
     });
+    this.validatePatientAge(normalized.dayOfBirth);
 
-    if (existingDni) {
-      throw new ConflictException(`DNI ${dto.dni} is already registered`);
-    }
+    const passwordHash = await this.hashingService.hash(normalized.password);
 
-    // Verificar si el email ya existe
-    const existingEmail = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
-
-    if (existingEmail) {
-      throw new ConflictException(`Email ${dto.email} is already registered`);
-    }
-
-    // Hash de la contraseña
-    const passwordHash = await this.hashingService.hash(dto.password);
-
-    // Crear usuario
     const patient = await this.prisma.user.create({
       data: {
-        dni: dto.dni,
-        email: dto.email,
+        dni: normalized.dni,
+        email: normalized.email,
         passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        dayOfBirth: new Date(dto.dayOfBirth),
-        phone: dto.phone,
-        gender: dto.gender,
-        profileImage: dto.profileImage,
+        firstName: normalized.firstName,
+        lastName: normalized.lastName,
+        dayOfBirth: normalized.dayOfBirth,
+        phone: normalized.phone,
+        gender: normalized.gender,
+        profileImage: normalized.profileImage,
         role: Role.PATIENT,
+        isActive: normalized.isActive,
       },
     });
 
@@ -372,47 +396,138 @@ export class PatientsService {
   ): Promise<AdminPatientDetailDto> {
     this.logger.log(`Updating patient: ${patientId}`);
 
-    const patient = await this.prisma.user.findUnique({
-      where: { id: patientId },
-    });
+    const patient = await this.getPatientEntity(patientId);
+    const normalized = this.normalizeUpdatePayload(dto);
 
-    if (!patient) {
-      throw new NotFoundException(`Patient with ID ${patientId} not found`);
+    const uniqueChecks: { dni?: string; email?: string } = {};
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (normalized.dni !== undefined && normalized.dni !== patient.dni) {
+      uniqueChecks.dni = normalized.dni;
+      updateData.dni = normalized.dni;
     }
 
-    if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
+    if (normalized.email !== undefined && normalized.email !== patient.email) {
+      uniqueChecks.email = normalized.email;
+      updateData.email = normalized.email;
     }
 
-    // Verificar email único si se está cambiando
-    if (dto.email && dto.email !== patient.email) {
-      const existingEmail = await this.prisma.user.findUnique({
-        where: { email: dto.email },
+    if (Object.keys(uniqueChecks).length > 0) {
+      await this.ensureUniqueIdentifiers(uniqueChecks, {
+        excludePatientId: patientId,
       });
-
-      if (existingEmail) {
-        throw new ConflictException(`Email ${dto.email} is already in use`);
-      }
     }
 
-    // Actualizar paciente
-    await this.prisma.user.update({
-      where: { id: patientId },
-      data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        email: dto.email,
-        phone: dto.phone,
-        gender: dto.gender,
-        dayOfBirth: dto.dayOfBirth ? new Date(dto.dayOfBirth) : undefined,
-        profileImage: dto.profileImage,
-        isActive: dto.isActive,
-      },
-    });
+    if (normalized.firstName !== undefined) {
+      updateData.firstName = normalized.firstName;
+    }
+
+    if (normalized.lastName !== undefined) {
+      updateData.lastName = normalized.lastName;
+    }
+
+    if (normalized.phone !== undefined) {
+      updateData.phone = normalized.phone;
+    }
+
+    if (normalized.gender !== undefined) {
+      updateData.gender = { set: normalized.gender };
+    }
+
+    if (normalized.profileImage !== undefined) {
+      updateData.profileImage = normalized.profileImage;
+    }
+
+    if (normalized.dayOfBirth !== undefined) {
+      this.validatePatientAge(normalized.dayOfBirth);
+      updateData.dayOfBirth = normalized.dayOfBirth;
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.user.update({
+        where: { id: patientId },
+        data: updateData,
+      });
+    }
+
+    if (normalized.isActive === false) {
+      return this.deactivatePatient(patientId);
+    }
+
+    if (normalized.isActive === true) {
+      await this.reactivatePatient(patientId);
+    }
 
     this.logger.log(`Patient updated successfully: ${patientId}`);
 
-    // Retornar detalle actualizado
+    return this.getPatientById(patientId);
+  }
+
+  async canDeactivatePatient(
+    patientId: string,
+  ): Promise<CanDeactivatePatientResponse> {
+    await this.getPatientEntity(patientId);
+
+    const futureAppointments = await this.hasFutureAppointments(patientId);
+    const reasons: string[] = [];
+
+    if (futureAppointments > 0) {
+      reasons.push(
+        `El paciente tiene ${futureAppointments} cita(s) futura(s) pendiente(s).`,
+      );
+    }
+
+    return {
+      canDeactivate: reasons.length === 0,
+      reasons,
+      warnings: [],
+      metadata: { futureAppointments },
+    };
+  }
+
+  async deactivatePatient(patientId: string): Promise<AdminPatientDetailDto> {
+    const patient = await this.getPatientEntity(patientId);
+
+    if (!patient.isActive) {
+      throw new PatientCannotBeDeactivatedException(
+        ['El paciente ya se encuentra inactivo.'],
+        { reason: 'already_inactive' },
+      );
+    }
+
+    const validation = await this.canDeactivatePatient(patientId);
+
+    if (!validation.canDeactivate) {
+      throw new PatientCannotBeDeactivatedException(
+        validation.reasons,
+        validation.metadata,
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: patientId },
+      data: { isActive: false },
+    });
+
+    this.logger.log(`Patient deactivated successfully: ${patientId}`);
+
+    return this.getPatientById(patientId);
+  }
+
+  async reactivatePatient(patientId: string): Promise<AdminPatientDetailDto> {
+    const patient = await this.getPatientEntity(patientId);
+
+    if (patient.isActive) {
+      return this.getPatientById(patientId);
+    }
+
+    await this.prisma.user.update({
+      where: { id: patientId },
+      data: { isActive: true },
+    });
+
+    this.logger.log(`Patient reactivated successfully: ${patientId}`);
+
     return this.getPatientById(patientId);
   }
 
@@ -422,27 +537,193 @@ export class PatientsService {
   async deletePatient(patientId: string): Promise<{ message: string }> {
     this.logger.log(`Deleting patient: ${patientId}`);
 
+    await this.deactivatePatient(patientId);
+
+    return { message: 'Patient deactivated successfully' };
+  }
+
+  private async getPatientEntity(patientId: string) {
     const patient = await this.prisma.user.findUnique({
       where: { id: patientId },
     });
 
-    if (!patient) {
-      throw new NotFoundException(`Patient with ID ${patientId} not found`);
+    if (!patient || patient.role !== Role.PATIENT) {
+      throw new PatientNotFoundException(patientId);
     }
 
-    if (patient.role !== Role.PATIENT) {
-      throw new NotFoundException(`User with ID ${patientId} is not a patient`);
+    return patient;
+  }
+
+  private normalizeCreatePayload(
+    payload: CreatePatientDto,
+  ): NormalizedCreatePatientPayload {
+    const {
+      dni,
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      gender,
+      dayOfBirth,
+      profileImage,
+    } = payload;
+
+    const normalizedDayOfBirth = new Date(dayOfBirth);
+    if (Number.isNaN(normalizedDayOfBirth.getTime())) {
+      throw new BadRequestException('Fecha de nacimiento inválida.');
     }
 
-    // Desactivar en lugar de eliminar (soft delete)
-    await this.prisma.user.update({
-      where: { id: patientId },
-      data: { isActive: false },
+    const trimmedPhone = phone?.trim();
+    const trimmedProfileImage = profileImage?.trim();
+
+    return {
+      dni: dni.trim(),
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: trimmedPhone && trimmedPhone.length > 0 ? trimmedPhone : null,
+      gender,
+      dayOfBirth: normalizedDayOfBirth,
+      profileImage:
+        trimmedProfileImage && trimmedProfileImage.length > 0
+          ? trimmedProfileImage
+          : null,
+      isActive: true,
+    };
+  }
+
+  private normalizeUpdatePayload(
+    payload: UpdatePatientDto,
+  ): NormalizedUpdatePatientPayload {
+    const {
+      dni,
+      email,
+      firstName,
+      lastName,
+      phone,
+      gender,
+      profileImage,
+      isActive,
+      dayOfBirth,
+    } = payload;
+
+    const normalized: NormalizedUpdatePatientPayload = {};
+
+    if (typeof dni === 'string') {
+      const trimmedDni = dni.trim();
+      if (trimmedDni.length > 0) {
+        normalized.dni = trimmedDni;
+      }
+    }
+
+    if (typeof email === 'string') {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (normalizedEmail.length > 0) {
+        normalized.email = normalizedEmail;
+      }
+    }
+
+    if (typeof firstName === 'string') {
+      const trimmedFirstName = firstName.trim();
+      if (trimmedFirstName.length > 0) {
+        normalized.firstName = trimmedFirstName;
+      }
+    }
+
+    if (typeof lastName === 'string') {
+      const trimmedLastName = lastName.trim();
+      if (trimmedLastName.length > 0) {
+        normalized.lastName = trimmedLastName;
+      }
+    }
+
+    if (typeof phone === 'string') {
+      const trimmedPhone = phone.trim();
+      normalized.phone = trimmedPhone.length > 0 ? trimmedPhone : null;
+    }
+
+    if (gender !== undefined) {
+      normalized.gender = gender;
+    }
+
+    if (typeof profileImage === 'string') {
+      const trimmedProfileImage = profileImage.trim();
+      normalized.profileImage =
+        trimmedProfileImage.length > 0 ? trimmedProfileImage : null;
+    }
+
+    if (typeof isActive === 'boolean') {
+      normalized.isActive = isActive;
+    }
+
+    if (typeof dayOfBirth === 'string') {
+      const dateValue = new Date(dayOfBirth);
+      if (Number.isNaN(dateValue.getTime())) {
+        throw new BadRequestException('Fecha de nacimiento inválida.');
+      }
+      normalized.dayOfBirth = dateValue;
+    }
+
+    return normalized;
+  }
+
+  private async ensureUniqueIdentifiers(
+    identifiers: NormalizedPatientIdentifiers,
+    options: { excludePatientId?: string } = {},
+  ): Promise<void> {
+    const { excludePatientId } = options;
+
+    if (identifiers.dni) {
+      const where: Prisma.UserWhereInput = { dni: identifiers.dni };
+      if (excludePatientId) {
+        where.id = { not: excludePatientId };
+      }
+      const existingDni = await this.prisma.user.findFirst({ where });
+
+      if (existingDni) {
+        throw new PatientAlreadyExistsException('dni', identifiers.dni);
+      }
+    }
+
+    if (identifiers.email) {
+      const where: Prisma.UserWhereInput = { email: identifiers.email };
+      if (excludePatientId) {
+        where.id = { not: excludePatientId };
+      }
+      const existingEmail = await this.prisma.user.findFirst({ where });
+
+      if (existingEmail) {
+        throw new PatientAlreadyExistsException('email', identifiers.email);
+      }
+    }
+  }
+
+  private validatePatientAge(dayOfBirth: Date): void {
+    if (!(dayOfBirth instanceof Date) || Number.isNaN(dayOfBirth.getTime())) {
+      throw new BadRequestException('Fecha de nacimiento inválida.');
+    }
+
+    const age = this.calculateAge(dayOfBirth);
+
+    if (age < MIN_PATIENT_AGE) {
+      throw new BadRequestException(
+        `El paciente debe tener al menos ${MIN_PATIENT_AGE} años`,
+      );
+    }
+  }
+
+  private async hasFutureAppointments(patientId: string): Promise<number> {
+    return this.prisma.appointment.count({
+      where: {
+        userId: patientId,
+        slot: { startAt: { gte: new Date() } },
+        status: {
+          in: [AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED],
+        },
+      },
     });
-
-    this.logger.log(`Patient deactivated successfully: ${patientId}`);
-
-    return { message: 'Patient deactivated successfully' };
   }
 
   /**

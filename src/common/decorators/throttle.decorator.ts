@@ -3,7 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 /**
  * Rate limiting personalizado para endpoints de autenticación
  * Más restrictivo para prevenir brute force attacks
- * 
+ *
  * Límites:
  * - 3 requests por segundo
  * - 10 requests por minuto
@@ -15,7 +15,7 @@ export const ThrottleAuth = () =>
 /**
  * Rate limiting para endpoints públicos de lectura
  * Más generoso pero aún protegido
- * 
+ *
  * Límites:
  * - 20 requests por segundo
  * - 200 requests por minuto
@@ -26,7 +26,7 @@ export const ThrottlePublic = () =>
 /**
  * Rate limiting para operaciones críticas (booking, payments, etc.)
  * Muy restrictivo para prevenir abuso
- * 
+ *
  * Límites:
  * - 2 requests por segundo
  * - 10 requests por minuto

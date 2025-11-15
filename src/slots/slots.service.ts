@@ -61,7 +61,9 @@ export class SlotsService {
       result.slotsDeactivated = updateResult.count;
       result.slotsPreserved = futureFreeSlots.length - updateResult.count;
     } catch (error) {
-      result.errors.push(`Error deactivating slots for schedule ${scheduleId}: ${error.message}`);
+      result.errors.push(
+        `Error deactivating slots for schedule ${scheduleId}: ${error.message}`,
+      );
     }
 
     return result;
@@ -99,7 +101,9 @@ export class SlotsService {
         result.errors.push(...scheduleResult.errors);
       }
     } catch (error) {
-      result.errors.push(`Error deactivating slots for doctor ${doctorId}: ${error.message}`);
+      result.errors.push(
+        `Error deactivating slots for doctor ${doctorId}: ${error.message}`,
+      );
     }
 
     return result;
@@ -215,7 +219,9 @@ export class SlotsService {
 
       result.slotsReactivated = updateResult.count;
     } catch (error) {
-      result.errors.push(`Error reactivating slots for schedule ${scheduleId}: ${error.message}`);
+      result.errors.push(
+        `Error reactivating slots for schedule ${scheduleId}: ${error.message}`,
+      );
     }
 
     return result;
@@ -237,40 +243,47 @@ export class SlotsService {
   }> {
     const now = new Date();
 
-    const [totalStats, activeStats, statusStats, timeStats] = await Promise.all([
-      this.prisma.slot.count({
-        where: { schedule: { doctorId } },
-      }),
-      this.prisma.slot.groupBy({
-        by: ['isActive'],
-        where: { schedule: { doctorId } },
-        _count: { _all: true },
-      }),
-      this.prisma.slot.groupBy({
-        by: ['status'],
-        where: { 
-          schedule: { doctorId },
-          isActive: true,
-        },
-        _count: { _all: true },
-      }),
-      this.prisma.slot.groupBy({
-        by: ['isActive'],
-        where: { 
-          schedule: { doctorId },
-          startAt: { gte: now },
-        },
-        _count: { _all: true },
-      }),
-    ]);
+    const [totalStats, activeStats, statusStats, timeStats] = await Promise.all(
+      [
+        this.prisma.slot.count({
+          where: { schedule: { doctorId } },
+        }),
+        this.prisma.slot.groupBy({
+          by: ['isActive'],
+          where: { schedule: { doctorId } },
+          _count: { _all: true },
+        }),
+        this.prisma.slot.groupBy({
+          by: ['status'],
+          where: {
+            schedule: { doctorId },
+            isActive: true,
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.slot.groupBy({
+          by: ['isActive'],
+          where: {
+            schedule: { doctorId },
+            startAt: { gte: now },
+          },
+          _count: { _all: true },
+        }),
+      ],
+    );
 
     const activeSlots = activeStats.find((s) => s.isActive)?._count._all || 0;
-    const inactiveSlots = activeStats.find((s) => !s.isActive)?._count._all || 0;
+    const inactiveSlots =
+      activeStats.find((s) => !s.isActive)?._count._all || 0;
 
-    const freeSlots = statusStats.find((s) => s.status === 'FREE')?._count._all || 0;
-    const bookedSlots = statusStats.find((s) => s.status === 'BOOKED')?._count._all || 0;
-    const heldSlots = statusStats.find((s) => s.status === 'HELD')?._count._all || 0;
-    const blockedSlots = statusStats.find((s) => s.status === 'BLOCKED')?._count._all || 0;
+    const freeSlots =
+      statusStats.find((s) => s.status === 'FREE')?._count._all || 0;
+    const bookedSlots =
+      statusStats.find((s) => s.status === 'BOOKED')?._count._all || 0;
+    const heldSlots =
+      statusStats.find((s) => s.status === 'HELD')?._count._all || 0;
+    const blockedSlots =
+      statusStats.find((s) => s.status === 'BLOCKED')?._count._all || 0;
 
     const futureSlots = timeStats.find((s) => s.isActive)?._count._all || 0;
     const pastSlots = totalStats - futureSlots;

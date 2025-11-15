@@ -6,7 +6,7 @@ export class LoginDto {
     description: 'DNI del usuario para autenticación',
     example: '12345678',
     minLength: 8,
-    maxLength: 8
+    maxLength: 8,
   })
   @IsString()
   @IsNotEmpty()
@@ -15,7 +15,7 @@ export class LoginDto {
 
   @ApiProperty({
     description: 'Contraseña del usuario',
-    example: 'MiContraseña123!'
+    example: 'MiContraseña123!',
   })
   @IsString()
   @IsNotEmpty()

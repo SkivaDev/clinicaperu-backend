@@ -48,13 +48,15 @@ export class CurrentMonthMetricsDto {
   totalNoShows: number;
 
   @ApiProperty({
-    description: 'Tasa de ocupación en porcentaje (slots booked / slots totales)',
+    description:
+      'Tasa de ocupación en porcentaje (slots booked / slots totales)',
     example: 75.5,
   })
   occupancyRate: number;
 
   @ApiProperty({
-    description: 'Ingresos estimados del mes (citas atendidas × precio consulta)',
+    description:
+      'Ingresos estimados del mes (citas atendidas × precio consulta)',
     example: 4500.0,
   })
   estimatedRevenue: number;

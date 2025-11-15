@@ -59,7 +59,10 @@ export class MedicalRecordsController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 403, description: 'Cita no pertenece al doctor' })
   @ApiResponse({ status: 404, description: 'Cita no encontrada' })
-  @ApiResponse({ status: 409, description: 'Ya existe expediente para esta cita' })
+  @ApiResponse({
+    status: 409,
+    description: 'Ya existe expediente para esta cita',
+  })
   async create(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateMedicalRecordDto,
@@ -149,7 +152,10 @@ export class MedicalRecordsController {
     description: 'URL generada',
     type: UploadUrlResponseDto,
   })
-  @ApiResponse({ status: 403, description: 'Solo el creador puede subir archivos' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el creador puede subir archivos',
+  })
   @ApiResponse({ status: 404, description: 'Expediente no encontrado' })
   async generateUploadUrl(
     @CurrentUser() user: CurrentUserPayload,
@@ -173,7 +179,10 @@ export class MedicalRecordsController {
     description: 'Archivo confirmado',
     type: AttachmentConfirmedResponseDto,
   })
-  @ApiResponse({ status: 403, description: 'Solo el creador puede confirmar archivos' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el creador puede confirmar archivos',
+  })
   @ApiResponse({ status: 404, description: 'Expediente no encontrado' })
   async confirmAttachment(
     @CurrentUser() user: CurrentUserPayload,
@@ -204,6 +213,11 @@ export class MedicalRecordsController {
     @Param('id') id: string,
     @Param('key') key: string,
   ): Promise<DownloadUrlResponseDto> {
-    return this.medicalRecordsService.generateDownloadUrl(id, user.userId, user.role, key);
+    return this.medicalRecordsService.generateDownloadUrl(
+      id,
+      user.userId,
+      user.role,
+      key,
+    );
   }
 }

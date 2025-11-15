@@ -80,7 +80,7 @@ export class EmailProviderFactory {
         // Default to MAILHOG for development safety
         this.logger.warn(
           `Unknown EMAIL_PROVIDER "${providerEnv}", defaulting to MAILHOG. ` +
-          `Set EMAIL_PROVIDER=resend for production.`,
+            `Set EMAIL_PROVIDER=resend for production.`,
         );
         return EmailProviderType.MAILHOG;
     }
@@ -89,15 +89,20 @@ export class EmailProviderFactory {
   /**
    * Build provider configuration from environment variables
    */
-  private buildConfigFromEnv(providerType: EmailProviderType): EmailProviderConfig {
+  private buildConfigFromEnv(
+    providerType: EmailProviderType,
+  ): EmailProviderConfig {
     const config: EmailProviderConfig = {};
 
     switch (providerType) {
       case EmailProviderType.RESEND:
         config.apiKey = process.env.RESEND_API_KEY;
-        config.fromEmail = process.env.RESEND_FROM_EMAIL || 'clinicaperu@resend.dev';
+        config.fromEmail =
+          process.env.RESEND_FROM_EMAIL || 'clinicaperu@resend.dev';
         if (!config.apiKey) {
-          throw new Error('RESEND_API_KEY is required when using RESEND provider');
+          throw new Error(
+            'RESEND_API_KEY is required when using RESEND provider',
+          );
         }
         break;
 

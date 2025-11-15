@@ -3,10 +3,12 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
   HttpStatus,
+  HttpCode,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,7 +33,9 @@ import {
   AdminPatientDetailDto,
   CreatePatientDto,
   UpdatePatientDto,
+  CanDeactivatePatientResponseDto,
 } from './dto';
+import { PatientsDeactivateGuard } from './guards/patient-deactivate.guard';
 
 @ApiTags('patients')
 @Controller('patients')
@@ -141,6 +145,70 @@ export class PatientsController {
   }
 
   /**
+   * ADMIN: GET /patients/admin/:id/can-deactivate
+   * Valida si un paciente puede ser desactivado
+   */
+  @Get('admin/:id/can-deactivate')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Validar si el paciente puede desactivarse (Admin)',
+    description:
+      'Retorna el resultado de la validación para desactivar un paciente. Solo accesible para administradores.',
+  })
+  @ApiOkResponse({
+    description: 'Validación completada exitosamente',
+    type: ResponseDto<CanDeactivatePatientResponseDto>,
+  })
+  @ApiUnauthorizedResponse({ description: 'No autenticado' })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async canDeactivatePatient(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<CanDeactivatePatientResponseDto>> {
+    const validation = await this.patientsService.canDeactivatePatient(id);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Validación completada',
+      data: validation,
+    };
+  }
+
+  /**
+   * ADMIN: PATCH /patients/admin/:id/deactivate
+   * Desactiva un paciente explícitamente
+   */
+  @Patch('admin/:id/deactivate')
+  @Roles(Role.ADMIN)
+  @UseGuards(PatientsDeactivateGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Desactivar paciente (Admin)',
+    description:
+      'Desactiva un paciente solo si cumple con las validaciones requeridas.',
+  })
+  @ApiOkResponse({
+    description: 'Paciente desactivado exitosamente',
+    type: ResponseDto<AdminPatientDetailDto>,
+  })
+  @ApiUnauthorizedResponse({ description: 'No autenticado' })
+  @ApiForbiddenResponse({
+    description: 'No tiene permisos (requiere rol ADMIN)',
+  })
+  async deactivatePatient(
+    @Param('id') id: string,
+  ): Promise<ResponseDto<AdminPatientDetailDto>> {
+    const patient = await this.patientsService.deactivatePatient(id);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Patient deactivated successfully',
+      data: patient,
+    };
+  }
+
+  /**
    * ADMIN: POST /patients/admin
    * Crea un nuevo paciente
    * Solo accesible para administradores
@@ -181,6 +249,7 @@ export class PatientsController {
    */
   @Put('admin/:id')
   @Roles(Role.ADMIN)
+  @UseGuards(PatientsDeactivateGuard)
   @ApiOperation({
     summary: 'Actualizar paciente (Admin)',
     description:

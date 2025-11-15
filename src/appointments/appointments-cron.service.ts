@@ -37,29 +37,30 @@ export class AppointmentsCronService {
       );
 
       // Find all CONFIRMED appointments from yesterday that haven't been marked as attended
-      const confirmedAppointmentsFromYesterday = await this.prisma.appointment.findMany({
-        where: {
-          status: AppointmentStatus.CONFIRMED,
-          slot: {
-            startAt: {
-              gte: yesterday,
-              lte: yesterdayEnd,
+      const confirmedAppointmentsFromYesterday =
+        await this.prisma.appointment.findMany({
+          where: {
+            status: AppointmentStatus.CONFIRMED,
+            slot: {
+              startAt: {
+                gte: yesterday,
+                lte: yesterdayEnd,
+              },
             },
           },
-        },
-        include: {
-          slot: true,
-          user: {
-            select: { firstName: true, lastName: true, email: true },
-          },
-          doctor: {
-            include: {
-              user: { select: { firstName: true, lastName: true } },
-              specialty: { select: { name: true } },
+          include: {
+            slot: true,
+            user: {
+              select: { firstName: true, lastName: true, email: true },
+            },
+            doctor: {
+              include: {
+                user: { select: { firstName: true, lastName: true } },
+                specialty: { select: { name: true } },
+              },
             },
           },
-        },
-      });
+        });
 
       this.logger.log(
         `Found ${confirmedAppointmentsFromYesterday.length} CONFIRMED appointments from yesterday to process`,
@@ -111,7 +112,6 @@ export class AppointmentsCronService {
       this.logger.log(
         `Daily no-show processing completed: ${processedCount} appointments marked as NO_SHOW, ${errorCount} errors, took ${duration}ms`,
       );
-
     } catch (error) {
       this.logger.error(
         `Fatal error in daily no-show processing: ${(error as Error).message}`,
@@ -193,9 +193,10 @@ export class AppointmentsCronService {
       }
 
       if (processedCount > 0) {
-        this.logger.log(`Hourly no-show check completed: ${processedCount} appointments marked as NO_SHOW`);
+        this.logger.log(
+          `Hourly no-show check completed: ${processedCount} appointments marked as NO_SHOW`,
+        );
       }
-
     } catch (error) {
       this.logger.error(
         `Fatal error in hourly no-show check: ${(error as Error).message}`,

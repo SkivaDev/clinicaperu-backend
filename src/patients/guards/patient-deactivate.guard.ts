@@ -5,30 +5,35 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { ClinicsService } from '../clinics.service';
+import { PatientsService } from '../patients.service';
+import type { UpdatePatientDto } from '../dto/update-patient.dto';
 
-interface ClinicDeactivateRequestBody {
+interface PatientDeactivateRequestBody extends Partial<UpdatePatientDto> {
   isActive?: boolean;
 }
 
+type PatientDeactivateRequest = Request<
+  { id: string },
+  unknown,
+  PatientDeactivateRequestBody
+>;
+
 @Injectable()
-export class ClinicDeactivateGuard implements CanActivate {
-  constructor(private readonly clinicsService: ClinicsService) {}
+export class PatientsDeactivateGuard implements CanActivate {
+  constructor(private readonly patientsService: PatientsService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
       .switchToHttp()
-      .getRequest<
-        Request<{ id: string }, unknown, ClinicDeactivateRequestBody>
-      >();
+      .getRequest<PatientDeactivateRequest>();
 
-    const clinicId = request.params?.id;
+    const patientId = request.params.id;
     const body = request.body ?? {};
     const method = request.method;
-    const url = request.originalUrl || request.url || '';
+    const url = request.originalUrl ?? request.url ?? '';
 
-    if (!clinicId) {
-      throw new ForbiddenException('Clinic ID es requerido');
+    if (!patientId) {
+      throw new ForbiddenException('Patient ID es requerido');
     }
 
     const isExplicitDeactivateRoute =
@@ -37,14 +42,15 @@ export class ClinicDeactivateGuard implements CanActivate {
     const shouldValidate = isExplicitDeactivateRoute || body.isActive === false;
 
     if (shouldValidate) {
-      const validation =
-        await this.clinicsService.canDeactivateClinic(clinicId);
+      const validation = await this.patientsService.canDeactivatePatient(patientId);
 
       if (!validation.canDeactivate) {
         throw new ForbiddenException({
-          message: 'No se puede desactivar la clínica',
+          message: 'No se puede desactivar el paciente',
           reasons: validation.reasons,
+
           warnings: validation.warnings,
+
           metadata: validation.metadata,
         });
       }

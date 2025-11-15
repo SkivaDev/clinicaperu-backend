@@ -35,7 +35,8 @@ export class ResendEmailProvider implements IEmailProvider {
     from?: string,
   ): Promise<EmailSendResult> {
     try {
-      const fromEmail = from || this.config.fromEmail || 'clinicaperu@resend.dev';
+      const fromEmail =
+        from || this.config.fromEmail || 'clinicaperu@resend.dev';
 
       this.logger.debug(`Sending email via Resend: ${subject} to ${to}`);
 
@@ -55,10 +56,15 @@ export class ResendEmailProvider implements IEmailProvider {
         },
       };
 
-      this.logger.log(`✅ Email sent via Resend: ${subject} to ${to} (ID: ${sendResult.messageId})`);
+      this.logger.log(
+        `✅ Email sent via Resend: ${subject} to ${to} (ID: ${sendResult.messageId})`,
+      );
       return sendResult;
     } catch (error) {
-      this.logger.error(`❌ Resend email failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `❌ Resend email failed: ${error.message}`,
+        error.stack,
+      );
 
       // Handle specific Resend errors
       if (error.statusCode) {
@@ -70,7 +76,9 @@ export class ResendEmailProvider implements IEmailProvider {
           case 422:
             throw new Error('Invalid email data provided to Resend');
           default:
-            throw new Error(`Resend API error (${error.statusCode}): ${error.message}`);
+            throw new Error(
+              `Resend API error (${error.statusCode}): ${error.message}`,
+            );
         }
       }
 
@@ -88,7 +96,9 @@ export class ResendEmailProvider implements IEmailProvider {
     // For now, we'll render the template locally and send as HTML
     // TODO: Implement proper Resend template handling when API supports it
 
-    this.logger.warn(`⚠️ Template emails via Resend are not fully implemented. Using HTML fallback for template: ${templateId}`);
+    this.logger.warn(
+      `⚠️ Template emails via Resend are not fully implemented. Using HTML fallback for template: ${templateId}`,
+    );
 
     // For now, create a simple HTML representation of the template variables
     const html = `

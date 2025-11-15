@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, MinLength, MaxLength, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MinLength,
+  MaxLength,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -18,13 +25,16 @@ export class CreateSpecialtyDto {
 
   @ApiPropertyOptional({
     description: 'Descripción de la especialidad',
-    example: 'Especialidad médica que se encarga del diagnóstico y tratamiento de enfermedades del corazón',
+    example:
+      'Especialidad médica que se encarga del diagnóstico y tratamiento de enfermedades del corazón',
     minLength: 10,
     maxLength: 500,
   })
   @IsOptional()
   @IsString()
-  @MinLength(10, { message: 'La descripción debe tener al menos 10 caracteres' })
+  @MinLength(10, {
+    message: 'La descripción debe tener al menos 10 caracteres',
+  })
   @MaxLength(500, { message: 'La descripción no puede exceder 500 caracteres' })
   @Transform(({ value }) => value?.trim())
   description?: string;

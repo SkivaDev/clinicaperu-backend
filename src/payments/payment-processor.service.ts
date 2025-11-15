@@ -12,7 +12,10 @@ import { SimulatedCardDto } from './dto/simulated-card.dto';
 import { PaymentStatus, AppointmentStatus, SlotStatus } from '@prisma/client';
 
 export class PaymentFailedException extends HttpException {
-  constructor(message: string, public readonly retryable: boolean = true) {
+  constructor(
+    message: string,
+    public readonly retryable: boolean = true,
+  ) {
     super(
       {
         success: false,
@@ -160,11 +163,7 @@ export class PaymentProcessorService {
           startTime,
         );
       } else if (scenario.result === 'failed') {
-        return await this.handleFailedPayment(
-          payment,
-          scenario,
-          startTime,
-        );
+        return await this.handleFailedPayment(payment, scenario, startTime);
       } else {
         // timeout
         return await this.handleTimeoutPayment(payment, startTime);
@@ -320,9 +319,7 @@ export class PaymentProcessorService {
       });
     });
 
-    this.logger.warn(
-      `Payment ${payment.id} failed: ${scenario.reason}`,
-    );
+    this.logger.warn(`Payment ${payment.id} failed: ${scenario.reason}`);
 
     throw new PaymentFailedException(scenario.errorMessage, true);
   }
