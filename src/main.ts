@@ -3,16 +3,22 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-// import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // lo comente porque el bullboard no me funcionaba / Configurar Express para manejar UTF-8 correctamente
-  // app.use((req: Request, res: Response, next: NextFunction) => {
-  //   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  //   next();
-  // });
+  // ✅ Middleware UTF-8 para todas las rutas EXCEPTO BullBoard
+  // BullBoard maneja su propio Content-Type, por eso lo excluimos
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // No aplicar a BullBoard (usa sus propios headers)
+    if (req.path.startsWith('/admin/queues')) {
+      return next();
+    }
+    // Para todas las demás rutas, asegurar UTF-8
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    next();
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

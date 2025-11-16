@@ -127,7 +127,9 @@ export class AvailabilityService {
     });
 
     if (!doctor) {
-      throw new NotFoundException(`Doctor with ID ${filters.doctorId} not found`);
+      throw new NotFoundException(
+        `Doctor with ID ${filters.doctorId} not found`,
+      );
     }
 
     // Extraer todos los slots y ordenarlos
@@ -169,6 +171,10 @@ export class AvailabilityService {
         nextAvailableSlots: slots.slice(0, 5), // Primeros 5 para preview
       },
       slots, // TODOS los slots para el calendario
+      dateRange: {
+        start: dateRange.start.toISOString(),
+        end: dateRange.end.toISOString(),
+      },
       stats: {
         totalAvailableSlots,
         availableDoctors,
@@ -182,26 +188,53 @@ export class AvailabilityService {
 
   /**
    * Calcula el rango de fechas basado en la vista del calendario
+   * Para MONTH: normaliza al primer día del mes y calcula hasta el primer día del mes siguiente
    */
   private calculateDateRangeByView(
     startDate: Date,
     view: CalendarViewEnum,
   ): { start: Date; end: Date } {
-    const start = new Date(startDate);
-    const end = new Date(startDate);
+    let start: Date;
+    let end: Date;
 
     switch (view) {
       case CalendarViewEnum.DAY:
+        start = new Date(startDate);
+        end = new Date(startDate);
         end.setDate(end.getDate() + 1);
         break;
       case CalendarViewEnum.WEEK:
+        start = new Date(startDate);
+        end = new Date(startDate);
         end.setDate(end.getDate() + 7);
         break;
       case CalendarViewEnum.MONTH:
-        end.setMonth(end.getMonth() + 1);
+        // Normalizar al primer día del mes a medianoche
+        start = new Date(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          1,
+          0,
+          0,
+          0,
+          0,
+        );
+        // End = primer día del mes siguiente
+        end = new Date(
+          startDate.getFullYear(),
+          startDate.getMonth() + 1,
+          1,
+          0,
+          0,
+          0,
+          0,
+        );
         break;
       default:
-        end.setDate(end.getDate() + 7); // Default: semana
+        // Default: semana
+        start = new Date(startDate);
+        end = new Date(startDate);
+        end.setDate(end.getDate() + 7);
     }
 
     return { start, end };
