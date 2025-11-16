@@ -21,13 +21,38 @@ export const QUEUE_NAMES = {
     // Configuración global de BullMQ con Redis
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get('REDIS_HOST', 'localhost'),
-          port: configService.get('REDIS_PORT', 6379),
-          maxRetriesPerRequest: null, // Recomendado para BullMQ
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('REDIS_URL');
+
+        if (redisUrl) {
+          const url = new URL(redisUrl);
+
+          return {
+            connection: {
+              host: url.hostname,
+              port: url.port ? Number(url.port) : 6379,
+              username: url.username || undefined,
+              password: url.password || undefined,
+              maxRetriesPerRequest: null, // Recomendado para BullMQ
+            },
+          };
+        }
+
+        const host = configService.get<string>('REDIS_HOST', 'localhost');
+        const port = Number(configService.get<string>('REDIS_PORT', '6379'));
+        const username = configService.get<string>('REDIS_USERNAME');
+        const password = configService.get<string>('REDIS_PASSWORD');
+
+        return {
+          connection: {
+            host,
+            port,
+            username,
+            password,
+            maxRetriesPerRequest: null, // Recomendado para BullMQ
+          },
+        };
+      },
       inject: [ConfigService],
     }),
 

@@ -21,10 +21,10 @@ export class EmailService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Validate Redis environment variables (still needed for BullMQ)
-    if (!process.env.REDIS_HOST || !process.env.REDIS_PORT) {
+    // Validate Redis connection (BullMQ requires REDIS_URL)
+    if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
       throw new Error(
-        'Missing required environment variables: REDIS_HOST, REDIS_PORT',
+        'Missing required environment variable: REDIS_URL (or REDIS_HOST for local development)',
       );
     }
 
