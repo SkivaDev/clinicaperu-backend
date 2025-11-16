@@ -7,16 +7,16 @@ services:
     container_name: clinicaperu-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: skivadev
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: clinica-peru-db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-clinicaperu}
       LANG: en_US.UTF-8           # ✅ Fuerza UTF-8 en el sistema
       LC_ALL: en_US.UTF-8         # ✅ Fuerza UTF-8 en locale
     command: ['postgres', '-c', 'client_encoding=UTF8']  # ✅ Fuerza UTF-8 en conexiones
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - '5435:5432'
+      - '${POSTGRES_PORT:-5435}:5432'
     networks:
       - clinicaperu-network
 

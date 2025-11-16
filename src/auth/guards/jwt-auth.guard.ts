@@ -1,6 +1,7 @@
 import {
   ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -10,6 +11,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private reflector: Reflector) {
     super();
   }
@@ -37,12 +40,15 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest<Request>();
-
-    // Debug info (eliminar en producción)
-    console.log('🍪 Cookie token:', !!request.cookies?.['token']);
-    console.log('📋 Header token:', !!request.headers.authorization);
-    console.log('👤 User found:', !!user);
+    // ✅ Solo loggear en desarrollo, nunca en producción
+    if (process.env.NODE_ENV === 'development') {
+      const request = context.switchToHttp().getRequest<Request>();
+      this.logger.debug('Auth check', {
+        hasCookie: !!request.cookies?.['token'],
+        hasHeader: !!request.headers.authorization,
+        hasUser: !!user,
+      });
+    }
 
     if (err || !user) {
       throw err || new UnauthorizedException('Token inválido o expirado');

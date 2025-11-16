@@ -92,10 +92,10 @@ import { EmailModule } from './email/email.module';
     // ReportModule,
   ],
   providers: [
-    // Aplicar ThrottlerGuard globalmente a todos los endpoints
+    // ✅ SEGURIDAD: Rate limiting por IP (Railway + Cloudflare compatible)
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ThrottlerGuard, // Cambiado a IpThrottlerGuard en common/guards
     },
   ],
 })

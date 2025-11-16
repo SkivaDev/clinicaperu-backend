@@ -45,8 +45,7 @@ export class AuthService {
         throw error;
       }
 
-      // Error genérico para otros casos
-      console.log(error);
+      // ✅ No loggear información sensible en producción
       throw new InternalServerErrorException('Error registering user');
     }
   }
@@ -125,5 +124,20 @@ export class AuthService {
       }
       throw new UnauthorizedException('Error validating credentials');
     }
+  }
+
+  /**
+   * ✅ SEGURIDAD: Método para obtener usuario por ID (usado en refresh token)
+   */
+  async findUserById(userId: string): Promise<{ id: string; dni: string; role: string } | null> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      return null;
+    }
+    return {
+      id: user.id,
+      dni: user.dni,
+      role: user.role,
+    };
   }
 }

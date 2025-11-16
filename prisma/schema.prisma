@@ -109,11 +109,35 @@ model User {
   // Relación con expedientes médicos
   createdMedicalRecords  MedicalRecord[]           @relation("CreatedMedicalRecords")
   medicalRecordAccess    MedicalRecordAccessLog[]
+  refreshTokens          RefreshToken[]
 
   @@index([lastName])
   @@index([firstName, lastName])
 }
 
+// ✅ SEGURIDAD: Modelo para almacenar refresh tokens
+// Access token: 15 minutos (corto, en cookie HttpOnly)
+// Refresh token: 7 días (largo, en cookie HttpOnly separada)
+model RefreshToken {
+  id           String   @id @default(uuid())
+  token        String   @unique
+  userId       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime?
+  
+  // Información de seguridad
+  ipAddress    String?
+  userAgent    String?
+  isRevoked    Boolean  @default(false)
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([token])
+}
 
 model Clinic {
   id           String  @id @default(uuid())

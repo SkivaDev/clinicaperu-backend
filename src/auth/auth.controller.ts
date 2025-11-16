@@ -6,7 +6,9 @@ import {
   HttpStatus,
   Post,
   Request,
+  Response,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,6 +27,9 @@ import { RegisterDto } from 'src/auth/dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser } from './types/user-without-password';
+import type { Response as ExpressResponse, Request as ExpressRequest } from 'express';
+import { RefreshTokenService } from './refresh-token.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 // import { JwtAuthGuard } from './guards/jwt-auth.guard';
 // import { RolesGuard } from './guards/roles.guard';
 // import { Role } from '@prisma/client';
@@ -36,7 +41,10 @@ import { AuthenticatedUser } from './types/user-without-password';
 @ApiTags('Autenticación')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly refreshTokenService: RefreshTokenService,
+  ) {}
 
   @Post('register')
   @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 registros por minuto
@@ -106,18 +114,43 @@ export class AuthController {
     description: 'Datos de entrada inválidos',
   })
   async login(
-    @Request() req: { user: AuthenticatedUser },
+    @Request() req: { user: AuthenticatedUser } & ExpressRequest,
     @Body() loginDto: LoginDto,
+    @Response({ passthrough: true }) res: ExpressResponse,
   ) {
     // El LocalAuthGuard ya validó las credenciales
-    // req.user contiene la información del usuario validado
-    const token = await this.authService.login(req.user);
+    const accessToken = await this.authService.login(req.user);
+
+    // ✅ SEGURIDAD: Generar refresh token (7 días)
+    const refreshToken = await this.refreshTokenService.generateRefreshToken(
+      req.user.id,
+      req.ip,
+      req.headers['user-agent'],
+    );
+
+    // ✅ Access token: cookie HttpOnly corta (15 min)
+    res.cookie('token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutos
+      path: '/',
+    });
+
+    // ✅ Refresh token: cookie HttpOnly larga (7 días)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+      path: '/',
+    });
 
     return {
       statusCode: HttpStatus.OK,
       message: 'Login successful',
       data: {
-        access_token: token,
+        access_token: accessToken,
         user: {
           id: req.user.id,
           email: req.user.email,
@@ -125,6 +158,105 @@ export class AuthController {
           lastName: req.user.lastName,
         },
       },
+    };
+  }
+
+  /**
+   * ✅ SEGURIDAD: Endpoint para refrescar access token
+   * Usa el refresh token (7 días) para generar un nuevo access token (15 min)
+   */
+  @Post('refresh')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Refrescar access token',
+    description:
+      'Genera un nuevo access token usando el refresh token de la cookie',
+  })
+  @ApiOkResponse({
+    description: 'Access token renovado exitosamente',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Refresh token inválido o expirado',
+  })
+  async refreshToken(
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true }) res: ExpressResponse,
+  ) {
+    const refreshToken = req.cookies['refreshToken'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not found');
+    }
+
+    // Validar refresh token y obtener userId
+    const userId =
+      await this.refreshTokenService.validateRefreshToken(refreshToken);
+
+    // Obtener información del usuario para el nuevo access token
+    const user = await this.authService.findUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Generar nuevo access token
+    const newAccessToken = this.refreshTokenService.generateAccessToken(
+      user.id,
+      user.dni,
+      user.role,
+    );
+
+    // Enviar nuevo access token en cookie
+    res.cookie('token', newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15 minutos
+      path: '/',
+    });
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Access token refreshed successfully',
+      data: {
+        access_token: newAccessToken,
+      },
+    };
+  }
+
+  /**
+   * ✅ SEGURIDAD: Logout que revoca el refresh token
+   */
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cerrar sesión',
+    description:
+      'Revoca el refresh token y limpia las cookies de autenticación',
+  })
+  @ApiOkResponse({
+    description: 'Sesión cerrada exitosamente',
+  })
+  async logout(
+    @Request() req: ExpressRequest,
+    @Response({ passthrough: true }) res: ExpressResponse,
+  ) {
+    const refreshToken = req.cookies['refreshToken'];
+
+    if (refreshToken) {
+      // Revocar el refresh token en la base de datos
+      await this.refreshTokenService.revokeRefreshToken(refreshToken);
+    }
+
+    // Limpiar cookies
+    res.clearCookie('token', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/' });
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Logged out successfully',
     };
   }
 

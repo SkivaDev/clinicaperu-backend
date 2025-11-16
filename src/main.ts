@@ -4,9 +4,19 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { Request, Response, NextFunction } from 'express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // ✅ Configurar Helmet para security headers
+  app.use(
+    helmet({
+      contentSecurityPolicy:
+        process.env.NODE_ENV === 'production' ? undefined : false,
+      crossOriginEmbedderPolicy: false, // Permite recursos externos
+    }),
+  );
 
   // ✅ Middleware UTF-8 para todas las rutas EXCEPTO BullBoard
   // BullBoard maneja su propio Content-Type, por eso lo excluimos
@@ -28,8 +38,25 @@ async function bootstrap() {
     }),
   );
 
+  // ✅ CORS con soporte para múltiples orígenes (desarrollo y producción)
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',')
+    : ['http://localhost:4321'];
+
   app.enableCors({
-    origin: 'http://localhost:4321',
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Permitir peticiones sin origin (herramientas como Postman, curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type,Authorization',
     credentials: true,

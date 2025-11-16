@@ -9,10 +9,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RolesGuard } from './guards/roles.guard';
 import { HashingModule } from 'src/common/hashing/hashing.module';
+import { RefreshTokenService } from './refresh-token.service';
+import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({
   providers: [
     AuthService,
+    RefreshTokenService,
     LocalStrategy,
     JwtStrategy,
     ConfigService,
@@ -23,11 +26,12 @@ import { HashingModule } from 'src/common/hashing/hashing.module';
     UsersModule,
     PassportModule,
     HashingModule,
+    PrismaModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1d' },
+        signOptions: { expiresIn: '15m' }, // ✅ SEGURIDAD: Access token corto (15 min)
       }),
       inject: [ConfigService],
     }),
