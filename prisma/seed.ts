@@ -1,16 +1,42 @@
 import * as bcrypt from 'bcrypt';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { config } from 'dotenv';
+
+// Cargar variables de entorno
+config();
 
 const prisma = new PrismaClient();
 
+// Obtener contraseñas desde variables de entorno
+// ⚠️ En producción, estas variables DEBEN estar configuradas con contraseñas seguras
+const SEED_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'admin123';
+const SEED_PATIENT_PASSWORD = process.env.SEED_PATIENT_PASSWORD || 'patient123';
+const SEED_DOCTOR_PASSWORD = process.env.SEED_DOCTOR_PASSWORD || 'doctor123';
+
+// Advertencia si se están usando contraseñas por defecto en producción
+if (process.env.NODE_ENV === 'production') {
+  if (
+    !process.env.SEED_ADMIN_PASSWORD ||
+    !process.env.SEED_PATIENT_PASSWORD ||
+    !process.env.SEED_DOCTOR_PASSWORD
+  ) {
+    console.warn(
+      '⚠️⚠️⚠️ WARNING: Using default passwords in PRODUCTION environment!',
+    );
+    console.warn(
+      '⚠️ Set SEED_ADMIN_PASSWORD, SEED_PATIENT_PASSWORD, and SEED_DOCTOR_PASSWORD in your .env file',
+    );
+  }
+}
+
 async function main() {
   // ========== ADMIN ==========
-  const adminPassword = await bcrypt.hash('admin123', 10);
+  const adminPassword = await bcrypt.hash(SEED_ADMIN_PASSWORD, 10);
   await prisma.user.upsert({
     where: { email: 'admin@example.com' },
     update: {},
     create: {
-      email: 'admin@example.com',
+      email: 'zeusnewlev@gmail.com',
       passwordHash: adminPassword,
       dni: '12345678',
       firstName: 'Admin',
@@ -23,7 +49,7 @@ async function main() {
   });
 
   // ========== PACIENTE ==========
-  const patientPassword = await bcrypt.hash('patient123', 10);
+  const patientPassword = await bcrypt.hash(SEED_PATIENT_PASSWORD, 10);
   await prisma.user.upsert({
     where: { email: 'patient@example.com' },
     update: {},
@@ -276,7 +302,7 @@ async function main() {
   });
 
   // ========== MÁS PACIENTES ==========
-  const patient2Password = await bcrypt.hash('patient123', 10);
+  const patient2Password = await bcrypt.hash(SEED_PATIENT_PASSWORD, 10);
   const patient2 = await prisma.user.upsert({
     where: { email: 'maria.lopez@example.com' },
     update: {},
@@ -298,7 +324,7 @@ async function main() {
     update: {},
     create: {
       email: 'carlos.torres@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '56789012',
       firstName: 'Carlos',
       lastName: 'Torres Mendoza',
@@ -314,7 +340,7 @@ async function main() {
     update: {},
     create: {
       email: 'ana.rodriguez@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '67890123',
       firstName: 'Ana',
       lastName: 'Rodríguez Flores',
@@ -330,7 +356,7 @@ async function main() {
     update: {},
     create: {
       email: 'pedro.martinez@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '78901234',
       firstName: 'Pedro',
       lastName: 'Martínez Díaz',
@@ -345,7 +371,7 @@ async function main() {
     update: {},
     create: {
       email: 'lucia.garcia@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '89012345',
       firstName: 'Lucía',
       lastName: 'García Pérez',
@@ -361,7 +387,7 @@ async function main() {
     update: {},
     create: {
       email: 'roberto.silva@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '90123456',
       firstName: 'Roberto',
       lastName: 'Silva Castro',
@@ -376,7 +402,7 @@ async function main() {
     update: {},
     create: {
       email: 'sofia.ramirez@example.com',
-      passwordHash: await bcrypt.hash('patient123', 10),
+      passwordHash: await bcrypt.hash(SEED_PATIENT_PASSWORD, 10),
       dni: '01234567',
       firstName: 'Sofía',
       lastName: 'Ramírez Luna',
@@ -488,7 +514,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.ramirez@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '44556677',
       firstName: 'Carlos',
       lastName: 'Ramírez Lopez',
@@ -519,7 +545,7 @@ async function main() {
     update: {},
     create: {
       email: 'dra.gomez@example.com',
-      passwordHash: await bcrypt.hash('doctor456', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '99887766',
       firstName: 'María',
       lastName: 'Gómez Fernández',
@@ -550,7 +576,7 @@ async function main() {
     update: {},
     create: {
       email: 'dra.fernandez@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '11223344',
       firstName: 'Laura',
       lastName: 'Fernández Vega',
@@ -581,7 +607,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.gonzalez@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '22334455',
       firstName: 'Miguel',
       lastName: 'González Ríos',
@@ -612,7 +638,7 @@ async function main() {
     update: {},
     create: {
       email: 'dra.sanchez@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '33445566',
       firstName: 'Patricia',
       lastName: 'Sánchez Morales',
@@ -643,7 +669,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.herrera@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '55667788',
       firstName: 'Jorge',
       lastName: 'Herrera Castro',
@@ -674,7 +700,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.mendoza@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '66778899',
       firstName: 'Ricardo',
       lastName: 'Mendoza Silva',
@@ -705,7 +731,7 @@ async function main() {
     update: {},
     create: {
       email: 'dra.ortiz@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '77889900',
       firstName: 'Elena',
       lastName: 'Ortiz Paredes',
@@ -736,7 +762,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.vargas@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '88990011',
       firstName: 'Andrés',
       lastName: 'Vargas Luna',
@@ -767,7 +793,7 @@ async function main() {
     update: {},
     create: {
       email: 'dr.castro@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '99001122',
       firstName: 'Fernando',
       lastName: 'Castro Medina',
@@ -798,7 +824,7 @@ async function main() {
     update: {},
     create: {
       email: 'dra.rojas@example.com',
-      passwordHash: await bcrypt.hash('doctor123', 10),
+      passwordHash: await bcrypt.hash(SEED_DOCTOR_PASSWORD, 10),
       dni: '10111213',
       firstName: 'Daniela',
       lastName: 'Rojas Torres',

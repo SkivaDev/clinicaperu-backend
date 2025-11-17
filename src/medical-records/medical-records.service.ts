@@ -17,7 +17,7 @@ import {
   MedicalRecordResponseDto,
   MedicalRecordListResponseDto,
 } from './dto';
-import { v4 as uuidv4 } from 'uuid';
+// uuidv4 se movió al S3Service para archivos privados
 import { RecordType } from '@prisma/client';
 
 // Tipo para queries de Prisma
@@ -389,23 +389,21 @@ export class MedicalRecordsService {
       );
     }
 
-    // Generar key único para el archivo manualmente
-    const fileKey = `medical-records/${recordId}/${uuidv4()}-${dto.fileName}`;
-
-    // Usar el método del S3Service con recordId como userId (es solo para el path)
-    const { uploadUrl } = await this.s3Service.generateUploadUrl(
+    // Generar URL de subida privada usando el nuevo método
+    const { uploadUrl, key } = await this.s3Service.generatePrivateUploadUrl(
       recordId,
       dto.fileName,
       dto.fileType,
       300,
     );
 
-    this.logger.log(`Generated upload URL for record ${recordId}: ${fileKey}`);
+    this.logger.log(
+      `Generated private upload URL for record ${recordId}: ${key}`,
+    );
 
-    // Retornar con el key correcto que generamos
     return {
       uploadUrl,
-      key: fileKey,
+      key,
       expiresIn: 300,
     };
   }
@@ -485,8 +483,8 @@ export class MedicalRecordsService {
       throw new NotFoundException('Archivo no encontrado en este expediente');
     }
 
-    // Generar URL de descarga (15 minutos)
-    const downloadUrl = await this.s3Service.generateDownloadUrl(
+    // Generar URL de descarga privada (15 minutos)
+    const downloadUrl = await this.s3Service.generatePrivateDownloadUrl(
       attachmentKey,
       900,
     );

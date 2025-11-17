@@ -103,7 +103,7 @@ export class S3Service {
    * Genera una URL prefirmada para DESCARGAR un archivo desde S3
    * Se usa para mostrar la imagen de perfil en el frontend
    *
-   * @param key - La clave del objeto en S3
+   * @param key - La clave del objeto en S3 (sin prefijo public/private)
    * @param expiresIn - Tiempo de expiración en segundos (default: 300 = 5 min)
    * @returns URL prefirmada para descargar o null si falla
    */
@@ -131,6 +131,95 @@ export class S3Service {
       );
       // No lanzar error, solo retornar null
       // Esto permite que el perfil se muestre sin imagen si falla
+      return null;
+    }
+  }
+
+  /**
+   * Genera una URL prefirmada para SUBIR archivos privados (medical records)
+   * Estos archivos van a la carpeta private/ y requieren URLs prefirmadas para acceso
+   *
+   * @param recordId - ID del expediente médico
+   * @param fileName - Nombre original del archivo
+   * @param fileType - MIME type (ej: application/pdf, image/jpeg)
+   * @param expiresIn - Tiempo de expiración en segundos (default: 300 = 5 min)
+   * @returns { uploadUrl, key }
+   */
+  async generatePrivateUploadUrl(
+    recordId: string,
+    fileName: string,
+    fileType: string,
+    expiresIn: number = 300,
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const sanitizedFileName = this.sanitizeFileName(fileName);
+    const uniqueFileName = `${uuidv4()}-${sanitizedFileName}`;
+    // Key real en S3 con prefijo private/
+    const s3Key = `private/medical-records/${recordId}/${uniqueFileName}`;
+    // Key que se guardará en la DB (sin prefijo private/ para consistencia)
+    const privateKey = `medical-records/${recordId}/${uniqueFileName}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: s3Key,
+      ContentType: fileType,
+      Metadata: {
+        recordId,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+
+    try {
+      const uploadUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+      });
+
+      this.logger.log(
+        `Generated private upload URL for record ${recordId}: ${privateKey}`,
+      );
+
+      return { uploadUrl, key: privateKey };
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate private upload URL: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new Error('Failed to generate private upload URL');
+    }
+  }
+
+  /**
+   * Genera una URL prefirmada para DESCARGAR archivos privados (medical records)
+   * Agrega el prefijo private/ automáticamente
+   *
+   * @param key - La clave del objeto (sin prefijo private/)
+   * @param expiresIn - Tiempo de expiración en segundos (default: 900 = 15 min)
+   * @returns URL prefirmada
+   */
+  async generatePrivateDownloadUrl(
+    key: string,
+    expiresIn: number = 900,
+  ): Promise<string | null> {
+    // Agregar prefijo private/ si el key es de medical records
+    const s3Key = key.startsWith('medical-records/') ? `private/${key}` : key;
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: s3Key,
+    });
+
+    try {
+      const downloadUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+      });
+
+      this.logger.log(`Generated private download URL for key: ${s3Key}`);
+
+      return downloadUrl;
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate private download URL for key ${s3Key}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       return null;
     }
   }
