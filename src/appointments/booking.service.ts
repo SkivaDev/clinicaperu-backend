@@ -197,6 +197,22 @@ export class BookingService {
           // 2. Validaciones de negocio
           this.validateSlot(slot, logContext);
 
+          // 2.5 🔥 CRÍTICO: Verificar que NO exista ya un appointment con este slotId
+          // Esto previene el error P2002 (unique constraint violation)
+          const existingAppointment = await tx.appointment.findUnique({
+            where: { slotId: bookingDto.slotId },
+            select: { id: true, status: true },
+          });
+
+          if (existingAppointment) {
+            this.logger.error(
+              `${logContext} ❌ INCONSISTENCIA DETECTADA: Slot ${bookingDto.slotId} tiene estado ${slot.status} pero ya tiene appointment ${existingAppointment.id} (${existingAppointment.status})`,
+            );
+            throw new ConflictException(
+              'Este slot ya está reservado. Por favor, selecciona otro horario.',
+            );
+          }
+
           // 3. Validar límite de citas del paciente (opcional)
           await this.validatePatientLimit(
             tx,
