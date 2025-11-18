@@ -8,6 +8,7 @@ import {
   Delete,
   HttpStatus,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -222,10 +223,50 @@ export class SchedulesController {
     };
   }
 
+  @Get(':scheduleId/deactivation-preview')
+  @ApiOperation({
+    summary: 'Preview de desactivación de horario (Admin)',
+    description:
+      'Obtiene información sobre el impacto de desactivar un horario sin realizar la acción.',
+  })
+  @ApiParam({ name: 'doctorId', description: 'ID del doctor', type: String })
+  @ApiParam({ name: 'scheduleId', description: 'ID del horario', type: String })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Preview obtenido exitosamente',
+  })
+  async getDeactivationPreview(
+    @Param('doctorId') doctorId: string,
+    @Param('scheduleId') scheduleId: string,
+  ): Promise<
+    ResponseDto<{
+      canDeactivate: boolean;
+      blockedReason: string | null;
+      futureFreeSlotsCount: number;
+      futureBookedSlotsCount: number;
+      bookedSlotsWithin24h: number;
+      bookedSlotsAfter24h: number;
+      earliestBookedSlot: Date | null;
+      warnings: string[];
+    }>
+  > {
+    const result = await this.schedulesService.getDeactivationPreview(
+      doctorId,
+      scheduleId,
+    );
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Deactivation preview retrieved successfully',
+      data: result,
+    };
+  }
+
   @Delete(':scheduleId')
   @ApiOperation({
     summary: 'Desactivar un horario (Admin)',
-    description: 'Desactiva un horario específico y sus slots futuros libres.',
+    description:
+      'Desactiva un horario específico y sus slots futuros libres. Esta es una eliminación lógica. ' +
+      'Si force=true, se saltará la validación de citas en las próximas 24h.',
   })
   @ApiParam({ name: 'doctorId', description: 'ID del doctor', type: String })
   @ApiParam({ name: 'scheduleId', description: 'ID del horario', type: String })
@@ -236,12 +277,15 @@ export class SchedulesController {
   async deactivateSchedule(
     @Param('doctorId') doctorId: string,
     @Param('scheduleId') scheduleId: string,
+    @Query('force') force?: string,
   ): Promise<
     ResponseDto<{
       scheduleDeactivated: boolean;
       slotsDeactivated: number;
       slotsPreserved: number;
       futureBookedCount: number;
+      bookedSlotsWithin24h: number;
+      bookedSlotsAfter24h: number;
       errors: string[];
       warnings: string[];
     }>
@@ -249,6 +293,7 @@ export class SchedulesController {
     const result = await this.schedulesService.deactivateSchedule(
       doctorId,
       scheduleId,
+      force === 'true',
     );
     return {
       statusCode: HttpStatus.OK,

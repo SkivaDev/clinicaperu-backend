@@ -246,13 +246,13 @@ export class DoctorSchedulesController {
   }
 
   /**
-   * DELETE /doctor/schedules/:id - Eliminar (desactivar) un horario
+   * GET /doctor/schedules/:id/deactivation-preview - Preview de desactivación
    */
-  @Delete(':id')
+  @Get(':id/deactivation-preview')
   @ApiOperation({
-    summary: 'Eliminar un horario de tu agenda (soft delete)',
+    summary: 'Ver preview de desactivación de horario',
     description:
-      'Desactiva un horario marcándolo como inactivo. Los slots futuros libres también se desactivan.',
+      'Obtiene información sobre el impacto de desactivar un horario sin realizar la acción.',
   })
   @ApiParam({
     name: 'id',
@@ -261,8 +261,7 @@ export class DoctorSchedulesController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Horario desactivado exitosamente',
-    type: ScheduleResponseDto,
+    description: 'Preview obtenido exitosamente',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -272,10 +271,21 @@ export class DoctorSchedulesController {
     status: HttpStatus.FORBIDDEN,
     description: 'Este horario no pertenece a tu agenda',
   })
-  async remove(
+  async getDeactivationPreview(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
-  ): Promise<ResponseDto<ScheduleResponseDto>> {
+  ): Promise<
+    ResponseDto<{
+      canDeactivate: boolean;
+      blockedReason: string | null;
+      futureFreeSlotsCount: number;
+      futureBookedSlotsCount: number;
+      bookedSlotsWithin24h: number;
+      bookedSlotsAfter24h: number;
+      earliestBookedSlot: Date | null;
+      warnings: string[];
+    }>
+  > {
     const doctorId = await this.getDoctorIdFromUser(user.userId);
 
     // Verificar que el horario pertenece al doctor autenticado
@@ -292,12 +302,90 @@ export class DoctorSchedulesController {
       throw new NotFoundException('Este horario no pertenece a tu agenda');
     }
 
-    const schedule = await this.schedulesService.remove(id);
+    const preview = await this.schedulesService.getDeactivationPreview(
+      doctorId,
+      id,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Preview de desactivación obtenido exitosamente',
+      data: preview,
+    };
+  }
+
+  /**
+   * DELETE /doctor/schedules/:id - Eliminar (desactivar) un horario
+   */
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Eliminar un horario de tu agenda (soft delete)',
+    description:
+      'Desactiva un horario marcándolo como inactivo. Los slots futuros libres también se desactivan. ' +
+      'Bloqueado si hay citas en las próximas 24h.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del horario (UUID)',
+    type: String,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Horario desactivado exitosamente',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Horario no encontrado',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Hay citas reservadas en las próximas 24 horas',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Este horario no pertenece a tu agenda',
+  })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<
+    ResponseDto<{
+      scheduleDeactivated: boolean;
+      slotsDeactivated: number;
+      slotsPreserved: number;
+      futureBookedCount: number;
+      bookedSlotsWithin24h: number;
+      bookedSlotsAfter24h: number;
+      errors: string[];
+      warnings: string[];
+    }>
+  > {
+    const doctorId = await this.getDoctorIdFromUser(user.userId);
+
+    // Verificar que el horario pertenece al doctor autenticado
+    const scheduleData = await this.prisma.schedule.findUnique({
+      where: { id },
+      select: { doctorId: true },
+    });
+
+    if (!scheduleData) {
+      throw new NotFoundException('Horario no encontrado');
+    }
+
+    if (scheduleData.doctorId !== doctorId) {
+      throw new NotFoundException('Este horario no pertenece a tu agenda');
+    }
+
+    const result = await this.schedulesService.deactivateSchedule(
+      doctorId,
+      id,
+      false, // Doctor nunca puede forzar
+    );
 
     return {
       statusCode: HttpStatus.OK,
       message: 'Horario desactivado exitosamente',
-      data: schedule,
+      data: result,
     };
   }
 

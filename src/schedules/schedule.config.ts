@@ -17,6 +17,10 @@ export const SCHEDULE_CONFIG = {
   // Maximum number of schedules per doctor per day
   MAX_SCHEDULES_PER_DAY: 10,
 
+  // Minimum hours before a booked appointment to allow schedule deactivation
+  // If there are appointments within this window, deactivation will be blocked
+  MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS: 24,
+
   // Timezone offset (in hours) - adjust based on your server location
   TIMEZONE_OFFSET: 0, // UTC by default
 } as const;

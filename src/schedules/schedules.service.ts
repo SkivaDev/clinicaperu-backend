@@ -351,15 +351,19 @@ export class SchedulesService {
   /**
    * Deactivates a specific schedule and its future free slots
    * This method implements soft deletion without losing historical data
+   * @param force - If true, bypasses the 24h policy check (admin only)
    */
   async deactivateSchedule(
     doctorId: string,
     scheduleId: string,
+    force = false,
   ): Promise<{
     scheduleDeactivated: boolean;
     slotsDeactivated: number;
     slotsPreserved: number;
     futureBookedCount: number;
+    bookedSlotsWithin24h: number;
+    bookedSlotsAfter24h: number;
     errors: string[];
     warnings: string[];
   }> {
@@ -388,19 +392,38 @@ export class SchedulesService {
           slotsDeactivated: 0,
           slotsPreserved: 0,
           futureBookedCount: 0,
+          bookedSlotsWithin24h: 0,
+          bookedSlotsAfter24h: 0,
           errors: ['Schedule is already inactive'],
           warnings: [],
         };
       }
 
-      // 2️⃣ Check for future booked appointments
-      const bookedCheck = await this.hasFutureBookedAppointments(scheduleId);
+      // 2️⃣ Policy C: Check for appointments within 24h (unless forced)
+      const bookedInfo = await this.hasFutureBookedAppointmentsWithinHours(
+        scheduleId,
+        this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS,
+      );
+
+      if (!force && bookedInfo.hasBookedSlotsWithinWindow) {
+        throw new ConflictException(
+          `No puedes desactivar este horario porque tienes ${bookedInfo.countWithinWindow} cita(s) reservada(s) en las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. Por favor, espera o reagenda estas citas primero.`,
+        );
+      }
+
       const warnings: string[] = [];
 
-      if (bookedCheck.hasBookedSlots) {
+      // Warning if there are appointments after 24h
+      if (bookedInfo.countAfterWindow > 0) {
         warnings.push(
-          `ADVERTENCIA: Este horario tiene ${bookedCheck.count} cita(s) futura(s) reservada(s). ` +
-            `Estas citas se mantendrán pero no podrás crear nuevas en este horario.`,
+          `ADVERTENCIA: Este horario tiene ${bookedInfo.countAfterWindow} cita(s) futura(s) reservada(s) después de las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. ` +
+            `Estas citas se mantendrán pero no podrás crear nuevos slots en este horario.`,
+        );
+      }
+
+      if (force && bookedInfo.hasBookedSlotsWithinWindow) {
+        warnings.push(
+          `ADVERTENCIA: Desactivación forzada. Hay ${bookedInfo.countWithinWindow} cita(s) en las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas que se mantendrán activas.`,
         );
       }
 
@@ -421,7 +444,10 @@ export class SchedulesService {
         scheduleDeactivated: true,
         slotsDeactivated: slotResult.slotsDeactivated,
         slotsPreserved: slotResult.slotsPreserved,
-        futureBookedCount: bookedCheck.count,
+        futureBookedCount:
+          bookedInfo.countWithinWindow + bookedInfo.countAfterWindow,
+        bookedSlotsWithin24h: bookedInfo.countWithinWindow,
+        bookedSlotsAfter24h: bookedInfo.countAfterWindow,
         errors: slotResult.errors,
         warnings,
       };
@@ -1028,6 +1054,154 @@ export class SchedulesService {
     return {
       hasBookedSlots: count > 0,
       count,
+    };
+  }
+
+  /**
+   * Helper: Checks if there are booked appointments within X hours
+   */
+  private async hasFutureBookedAppointmentsWithinHours(
+    scheduleId: string,
+    hours: number,
+  ): Promise<{
+    hasBookedSlotsWithinWindow: boolean;
+    countWithinWindow: number;
+    countAfterWindow: number;
+    earliestBookedSlot: Date | null;
+  }> {
+    const now = new Date();
+    const windowEnd = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+    const [slotsWithinWindow, slotsAfterWindow, earliestSlot] =
+      await Promise.all([
+        // Count slots within the time window
+        this.prisma.slot.count({
+          where: {
+            scheduleId,
+            startAt: { gte: now, lt: windowEnd },
+            status: { in: ['BOOKED', 'HELD'] },
+          },
+        }),
+        // Count slots after the time window
+        this.prisma.slot.count({
+          where: {
+            scheduleId,
+            startAt: { gte: windowEnd },
+            status: { in: ['BOOKED', 'HELD'] },
+          },
+        }),
+        // Get earliest booked slot
+        this.prisma.slot.findFirst({
+          where: {
+            scheduleId,
+            startAt: { gte: now },
+            status: { in: ['BOOKED', 'HELD'] },
+          },
+          orderBy: { startAt: 'asc' },
+          select: { startAt: true },
+        }),
+      ]);
+
+    return {
+      hasBookedSlotsWithinWindow: slotsWithinWindow > 0,
+      countWithinWindow: slotsWithinWindow,
+      countAfterWindow: slotsAfterWindow,
+      earliestBookedSlot: earliestSlot?.startAt || null,
+    };
+  }
+
+  /**
+   * Get deactivation preview without actually deactivating
+   */
+  async getDeactivationPreview(
+    doctorId: string,
+    scheduleId: string,
+  ): Promise<{
+    canDeactivate: boolean;
+    blockedReason: string | null;
+    futureFreeSlotsCount: number;
+    futureBookedSlotsCount: number;
+    bookedSlotsWithin24h: number;
+    bookedSlotsAfter24h: number;
+    earliestBookedSlot: Date | null;
+    warnings: string[];
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    // Verify schedule exists and belongs to doctor
+    const schedule = await this.prisma.schedule.findUnique({
+      where: { id: scheduleId },
+      select: { id: true, doctorId: true, isActive: true },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Schedule not found');
+    }
+
+    if (schedule.doctorId !== doctorId) {
+      throw new BadRequestException(
+        'Schedule does not belong to this doctor',
+      );
+    }
+
+    if (!schedule.isActive) {
+      return {
+        canDeactivate: false,
+        blockedReason: 'El horario ya está desactivado',
+        futureFreeSlotsCount: 0,
+        futureBookedSlotsCount: 0,
+        bookedSlotsWithin24h: 0,
+        bookedSlotsAfter24h: 0,
+        earliestBookedSlot: null,
+        warnings: [],
+      };
+    }
+
+    const now = new Date();
+
+    // Count future free slots
+    const futureFreeSlotsCount = await this.prisma.slot.count({
+      where: {
+        scheduleId,
+        startAt: { gte: now },
+        status: 'FREE',
+        isActive: true,
+      },
+    });
+
+    // Check booked appointments within time window
+    const bookedInfo = await this.hasFutureBookedAppointmentsWithinHours(
+      scheduleId,
+      this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS,
+    );
+
+    const warnings: string[] = [];
+    let canDeactivate = true;
+    let blockedReason: string | null = null;
+
+    // Policy C: Block if there are appointments within 24h
+    if (bookedInfo.hasBookedSlotsWithinWindow) {
+      canDeactivate = false;
+      blockedReason = `No puedes desactivar este horario porque tienes ${bookedInfo.countWithinWindow} cita(s) reservada(s) en las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. Por favor, espera o reagenda estas citas primero.`;
+    }
+
+    // Warning if there are appointments after 24h
+    if (bookedInfo.countAfterWindow > 0) {
+      warnings.push(
+        `Tienes ${bookedInfo.countAfterWindow} cita(s) futura(s) reservada(s) después de las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. Estas citas se mantendrán pero no podrás crear nuevos slots en este horario.`,
+      );
+    }
+
+    return {
+      canDeactivate,
+      blockedReason,
+      futureFreeSlotsCount,
+      futureBookedSlotsCount:
+        bookedInfo.countWithinWindow + bookedInfo.countAfterWindow,
+      bookedSlotsWithin24h: bookedInfo.countWithinWindow,
+      bookedSlotsAfter24h: bookedInfo.countAfterWindow,
+      earliestBookedSlot: bookedInfo.earliestBookedSlot,
+      warnings,
     };
   }
 }
