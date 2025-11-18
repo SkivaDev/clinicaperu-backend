@@ -32,6 +32,11 @@ import { EmailModule } from './email/email.module';
 // import { PdfModule } from './pdf/pdf.module'; PROXIMAMENTE
 // import { ReportModule } from './report/report.module'; PROXIMAMENTE
 
+const emailModules =
+  process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging'
+    ? [EmailModule]
+    : [];
+
 @Module({
   imports: [
     // Config Module - Variables de entorno
@@ -86,7 +91,7 @@ import { EmailModule } from './email/email.module';
     MedicalRecordsModule, // HU-031: Módulo de expedientes médicos
 
     // Módulos de trabajos asíncronos (usan QueueModule)
-    EmailModule,
+    ...emailModules,
     // NotificationModule,
     // PdfModule,
     // ReportModule,
