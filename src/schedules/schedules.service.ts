@@ -11,6 +11,7 @@ import { QueryScheduleDto } from './dto/query-schedule.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SlotGeneratorService } from 'src/slots/slot-generator.service';
 import { SlotsService } from 'src/slots/slots.service';
+import { getScheduleConfig } from './schedule.config';
 
 @Injectable()
 export class SchedulesService {
@@ -19,6 +20,8 @@ export class SchedulesService {
     private readonly slotGenerator: SlotGeneratorService,
     private readonly slotsService: SlotsService,
   ) {}
+
+  private readonly scheduleConfig = getScheduleConfig();
 
   private readonly DAY_NAMES = [
     'Domingo',
@@ -356,7 +359,9 @@ export class SchedulesService {
     scheduleDeactivated: boolean;
     slotsDeactivated: number;
     slotsPreserved: number;
+    futureBookedCount: number;
     errors: string[];
+    warnings: string[];
   }> {
     await this.validateDoctorExists(doctorId);
 
@@ -382,17 +387,30 @@ export class SchedulesService {
           scheduleDeactivated: false,
           slotsDeactivated: 0,
           slotsPreserved: 0,
+          futureBookedCount: 0,
           errors: ['Schedule is already inactive'],
+          warnings: [],
         };
       }
 
-      // 2️⃣ Deactivate the schedule
+      // 2️⃣ Check for future booked appointments
+      const bookedCheck = await this.hasFutureBookedAppointments(scheduleId);
+      const warnings: string[] = [];
+
+      if (bookedCheck.hasBookedSlots) {
+        warnings.push(
+          `ADVERTENCIA: Este horario tiene ${bookedCheck.count} cita(s) futura(s) reservada(s). ` +
+            `Estas citas se mantendrán pero no podrás crear nuevas en este horario.`,
+        );
+      }
+
+      // 3️⃣ Deactivate the schedule
       await tx.schedule.update({
         where: { id: scheduleId },
         data: { isActive: false },
       });
 
-      // 3️⃣ Deactivate future free slots for this schedule
+      // 4️⃣ Deactivate future free slots for this schedule
       const slotResult =
         await this.slotsService.deactivateFutureFreeSlotsForSchedule(
           tx,
@@ -403,7 +421,9 @@ export class SchedulesService {
         scheduleDeactivated: true,
         slotsDeactivated: slotResult.slotsDeactivated,
         slotsPreserved: slotResult.slotsPreserved,
+        futureBookedCount: bookedCheck.count,
         errors: slotResult.errors,
+        warnings,
       };
     });
   }
@@ -540,6 +560,9 @@ export class SchedulesService {
     this.validateTimeRange(dto.startTime, dto.endTime);
     this.validateSlotDuration(dto.startTime, dto.endTime, dto.slotMinutes);
     this.validateEffectiveDates(dto.effectiveFrom, dto.effectiveTo);
+
+    // Validate MAX_SCHEDULES_PER_DAY limit
+    await this.validateMaxSchedulesPerDay(dto.doctorId, dto.dayOfWeek);
 
     // Check for overlaps with existing schedules
     await this.validateNoOverlapWithExisting(dto);
@@ -692,6 +715,13 @@ export class SchedulesService {
       throw new NotFoundException(`Schedule with ID ${id} not found`);
     }
 
+    // Validate doctor ownership if doctorId is provided in dto
+    if (dto.doctorId && dto.doctorId !== existingSchedule.doctorId) {
+      throw new BadRequestException(
+        'No se puede cambiar el doctor de un horario existente',
+      );
+    }
+
     // Check if schedule has generated slots
     if (existingSchedule._count.slots > 0) {
       throw new ConflictException(
@@ -715,6 +745,17 @@ export class SchedulesService {
       this.validateEffectiveDates(
         dto.effectiveFrom || existingSchedule.effectiveFrom,
         dto.effectiveTo || existingSchedule.effectiveTo,
+      );
+    }
+
+    // Validate no overlap with other schedules if day or times are changing
+    if (dto.dayOfWeek !== undefined || dto.startTime || dto.endTime) {
+      await this.validateNoOverlapWithExistingExcludingSelf(
+        existingSchedule.doctorId,
+        dto.dayOfWeek ?? existingSchedule.dayOfWeek,
+        dto.startTime ?? existingSchedule.startTime,
+        dto.endTime ?? existingSchedule.endTime,
+        id,
       );
     }
 
@@ -910,5 +951,83 @@ export class SchedulesService {
   private timeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
+  }
+
+  /**
+   * Helper: Validates MAX_SCHEDULES_PER_DAY limit
+   */
+  private async validateMaxSchedulesPerDay(
+    doctorId: string,
+    dayOfWeek: number,
+  ): Promise<void> {
+    const count = await this.prisma.schedule.count({
+      where: {
+        doctorId,
+        dayOfWeek,
+        isActive: true,
+      },
+    });
+
+    if (count >= this.scheduleConfig.MAX_SCHEDULES_PER_DAY) {
+      throw new BadRequestException(
+        `No se pueden crear más de ${this.scheduleConfig.MAX_SCHEDULES_PER_DAY} horarios por día. ` +
+          `Actualmente tienes ${count} horarios activos en ${this.DAY_NAMES[dayOfWeek]}.`,
+      );
+    }
+  }
+
+  /**
+   * Helper: Validates no overlap with existing schedules (excluding a specific schedule)
+   */
+  private async validateNoOverlapWithExistingExcludingSelf(
+    doctorId: string,
+    dayOfWeek: number,
+    startTime: string,
+    endTime: string,
+    excludeScheduleId: string,
+  ): Promise<void> {
+    const existingSchedules = await this.prisma.schedule.findMany({
+      where: {
+        doctorId,
+        dayOfWeek,
+        isActive: true,
+        id: { not: excludeScheduleId },
+      },
+    });
+
+    for (const existing of existingSchedules) {
+      if (
+        this.timesOverlap(
+          startTime,
+          endTime,
+          existing.startTime,
+          existing.endTime,
+        )
+      ) {
+        throw new ConflictException(
+          `El horario se solapa con un horario existente en ${this.DAY_NAMES[dayOfWeek]} (${existing.startTime} - ${existing.endTime})`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Helper: Checks if there are future booked appointments for a schedule
+   */
+  private async hasFutureBookedAppointments(
+    scheduleId: string,
+  ): Promise<{ hasBookedSlots: boolean; count: number }> {
+    const count = await this.prisma.slot.count({
+      where: {
+        scheduleId,
+        startAt: { gte: new Date() },
+        status: { in: ['BOOKED', 'HELD'] },
+      },
+    });
+
+    return {
+      hasBookedSlots: count > 0,
+      count,
+    };
   }
 }

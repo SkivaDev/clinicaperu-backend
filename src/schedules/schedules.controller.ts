@@ -24,6 +24,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { getScheduleConfig } from './schedule.config';
 
 @ApiTags('admin/schedules')
 @Controller('admin/doctors/:doctorId/schedules')
@@ -32,6 +33,39 @@ import { Role } from '@prisma/client';
 @ApiBearerAuth()
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
+
+  @Get('config')
+  @ApiOperation({
+    summary: 'Obtener configuración de slots (Admin)',
+    description:
+      'Obtiene la configuración de generación de slots: horizonte, duraciones disponibles, límites.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Configuración obtenida exitosamente',
+  })
+  getScheduleConfig(): ResponseDto<{
+    slotGenerationWeeks: number;
+    slotGenerationDays: number;
+    maxSlotGenerationWeeks: number;
+    minSlotGenerationWeeks: number;
+    defaultSlotDurations: number[];
+    maxSchedulesPerDay: number;
+  }> {
+    const config = getScheduleConfig();
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Schedule configuration retrieved successfully',
+      data: {
+        slotGenerationWeeks: config.SLOT_GENERATION_WEEKS,
+        slotGenerationDays: config.SLOT_GENERATION_WEEKS * 7,
+        maxSlotGenerationWeeks: config.MAX_SLOT_GENERATION_WEEKS,
+        minSlotGenerationWeeks: config.MIN_SLOT_GENERATION_WEEKS,
+        defaultSlotDurations: [...config.DEFAULT_SLOT_DURATIONS],
+        maxSchedulesPerDay: config.MAX_SCHEDULES_PER_DAY,
+      },
+    };
+  }
 
   @Get()
   @ApiOperation({
@@ -207,7 +241,9 @@ export class SchedulesController {
       scheduleDeactivated: boolean;
       slotsDeactivated: number;
       slotsPreserved: number;
+      futureBookedCount: number;
       errors: string[];
+      warnings: string[];
     }>
   > {
     const result = await this.schedulesService.deactivateSchedule(
