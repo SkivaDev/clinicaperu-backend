@@ -1204,4 +1204,173 @@ export class SchedulesService {
       warnings,
     };
   }
+
+  /**
+   * Change/Edit schedule for doctor (safe edit flow)
+   * Instead of modifying an existing schedule with slots, this:
+   * 1. Deactivates the old schedule (preserving booked appointments)
+   * 2. Creates a new schedule with the new data
+   * 3. Generates slots for the new schedule
+   */
+  async changeScheduleForDoctor(
+    doctorId: string,
+    scheduleId: string,
+    newScheduleData: Omit<CreateScheduleDto, 'doctorId'>,
+  ): Promise<{
+    oldScheduleDeactivated: boolean;
+    newScheduleCreated: boolean;
+    oldSchedule: {
+      id: string;
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+    };
+    newSchedule: any;
+    slotsDeactivated: number;
+    slotsGenerated: number;
+    futureBookedCount: number;
+    bookedSlotsWithin24h: number;
+    bookedSlotsAfter24h: number;
+    warnings: string[];
+    errors: string[];
+  }> {
+    await this.validateDoctorExists(doctorId);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1️⃣ Verify the schedule exists and belongs to the doctor
+      const oldSchedule = await tx.schedule.findUnique({
+        where: { id: scheduleId },
+        select: {
+          id: true,
+          doctorId: true,
+          isActive: true,
+          dayOfWeek: true,
+          startTime: true,
+          endTime: true,
+        },
+      });
+
+      if (!oldSchedule) {
+        throw new NotFoundException('Schedule not found');
+      }
+
+      if (oldSchedule.doctorId !== doctorId) {
+        throw new BadRequestException(
+          'Schedule does not belong to this doctor',
+        );
+      }
+
+      if (!oldSchedule.isActive) {
+        throw new BadRequestException(
+          'Cannot edit an inactive schedule. Please reactivate it first or create a new one.',
+        );
+      }
+
+      // 2️⃣ Policy C: Check for appointments within 24h
+      const bookedInfo = await this.hasFutureBookedAppointmentsWithinHours(
+        scheduleId,
+        this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS,
+      );
+
+      if (bookedInfo.hasBookedSlotsWithinWindow) {
+        throw new ConflictException(
+          `No puedes editar este horario porque tienes ${bookedInfo.countWithinWindow} cita(s) reservada(s) en las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. Por favor, espera o reagenda estas citas primero.`,
+        );
+      }
+
+      // 3️⃣ Validate new schedule data
+      const { dayOfWeek, startTime, endTime, slotMinutes } = newScheduleData;
+
+      // Validate time range
+      this.validateTimeRange(startTime, endTime);
+
+      // Validate slot duration
+      this.validateSlotDuration(startTime, endTime, slotMinutes);
+
+      // Validate effective dates if provided
+      if (newScheduleData.effectiveFrom && newScheduleData.effectiveTo) {
+        this.validateEffectiveDates(
+          newScheduleData.effectiveFrom,
+          newScheduleData.effectiveTo,
+        );
+      }
+
+      // Validate no overlap with OTHER schedules (excluding this one)
+      await this.validateNoOverlapWithExistingExcludingSelf(
+        doctorId,
+        dayOfWeek,
+        startTime,
+        endTime,
+        scheduleId, // Exclude this schedule from overlap check
+      );
+
+      // Validate max schedules per day (if dayOfWeek is changing)
+      if (dayOfWeek !== oldSchedule.dayOfWeek) {
+        await this.validateMaxSchedulesPerDay(doctorId, dayOfWeek);
+      }
+
+      const warnings: string[] = [];
+      const errors: string[] = [];
+
+      // Warning if there are appointments after 24h
+      if (bookedInfo.countAfterWindow > 0) {
+        warnings.push(
+          `ADVERTENCIA: El horario anterior tiene ${bookedInfo.countAfterWindow} cita(s) futura(s) reservada(s) después de las próximas ${this.scheduleConfig.MIN_HOURS_BEFORE_DEACTIVATION_WITH_BOOKINGS} horas. ` +
+            `Estas citas se mantendrán en el horario anterior. Considera reprogramarlas al nuevo horario si es necesario.`,
+        );
+      }
+
+      // 4️⃣ Deactivate old schedule
+      await tx.schedule.update({
+        where: { id: scheduleId },
+        data: { isActive: false },
+      });
+
+      const deactivationResult =
+        await this.slotsService.deactivateFutureFreeSlotsForSchedule(
+          tx,
+          scheduleId,
+        );
+
+      // 5️⃣ Create new schedule
+      const newSchedule = await tx.schedule.create({
+        data: {
+          doctorId,
+          dayOfWeek,
+          startTime,
+          endTime,
+          slotMinutes,
+          effectiveFrom: newScheduleData.effectiveFrom || new Date(),
+          effectiveTo: newScheduleData.effectiveTo || null,
+          isActive: true,
+        },
+      });
+
+      // 6️⃣ Generate slots for new schedule
+      const generationResult = await this.slotGenerator.generateSlotsForSchedule(
+        tx,
+        newSchedule,
+      );
+
+      return {
+        oldScheduleDeactivated: true,
+        newScheduleCreated: true,
+        oldSchedule: {
+          id: oldSchedule.id,
+          dayOfWeek: oldSchedule.dayOfWeek,
+          startTime: oldSchedule.startTime,
+          endTime: oldSchedule.endTime,
+        },
+        newSchedule,
+        slotsDeactivated: deactivationResult.slotsDeactivated,
+        slotsGenerated: generationResult.slotsCreated,
+        futureBookedCount:
+          bookedInfo.countWithinWindow + bookedInfo.countAfterWindow,
+        bookedSlotsWithin24h: bookedInfo.countWithinWindow,
+        bookedSlotsAfter24h: bookedInfo.countAfterWindow,
+        warnings,
+        errors: deactivationResult.errors,
+      };
+    });
+  }
 }

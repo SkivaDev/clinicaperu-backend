@@ -185,13 +185,14 @@ export class DoctorSchedulesController {
   }
 
   /**
-   * PUT /doctor/schedules/:id - Actualizar un horario del doctor
+   * PUT /doctor/schedules/:id - Editar un horario del doctor (flujo seguro)
    */
   @Put(':id')
   @ApiOperation({
-    summary: 'Actualizar un horario de tu agenda',
+    summary: 'Editar un horario de tu agenda (flujo seguro)',
     description:
-      'Actualiza un horario existente. No se puede actualizar si ya tiene slots generados.',
+      'Edita un horario creando uno nuevo y desactivando el anterior. ' +
+      'Esto preserva las citas ya reservadas. Bloqueado si hay citas en las próximas 24h.',
   })
   @ApiParam({
     name: 'id',
@@ -200,8 +201,7 @@ export class DoctorSchedulesController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Horario actualizado exitosamente',
-    type: ScheduleResponseDto,
+    description: 'Horario editado exitosamente',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -209,7 +209,7 @@ export class DoctorSchedulesController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
-    description: 'No se puede actualizar un horario con slots generados',
+    description: 'Hay citas reservadas en las próximas 24 horas',
   })
   @ApiResponse({
     status: HttpStatus.FORBIDDEN,
@@ -217,31 +217,40 @@ export class DoctorSchedulesController {
   })
   async update(
     @Param('id') id: string,
-    @Body() updateScheduleDto: Partial<Omit<CreateScheduleDto, 'doctorId'>>,
+    @Body() newScheduleData: Omit<CreateScheduleDto, 'doctorId'>,
     @CurrentUser() user: CurrentUserPayload,
-  ): Promise<ResponseDto<ScheduleResponseDto>> {
+  ): Promise<
+    ResponseDto<{
+      oldScheduleDeactivated: boolean;
+      newScheduleCreated: boolean;
+      oldSchedule: {
+        id: string;
+        dayOfWeek: number;
+        startTime: string;
+        endTime: string;
+      };
+      newSchedule: any;
+      slotsDeactivated: number;
+      slotsGenerated: number;
+      futureBookedCount: number;
+      bookedSlotsWithin24h: number;
+      bookedSlotsAfter24h: number;
+      warnings: string[];
+      errors: string[];
+    }>
+  > {
     const doctorId = await this.getDoctorIdFromUser(user.userId);
 
-    // Verificar que el horario pertenece al doctor autenticado
-    const scheduleData = await this.prisma.schedule.findUnique({
-      where: { id },
-      select: { doctorId: true },
-    });
-
-    if (!scheduleData) {
-      throw new NotFoundException('Horario no encontrado');
-    }
-
-    if (scheduleData.doctorId !== doctorId) {
-      throw new NotFoundException('Este horario no pertenece a tu agenda');
-    }
-
-    const schedule = await this.schedulesService.update(id, updateScheduleDto);
+    const result = await this.schedulesService.changeScheduleForDoctor(
+      doctorId,
+      id,
+      newScheduleData,
+    );
 
     return {
       statusCode: HttpStatus.OK,
-      message: 'Horario actualizado exitosamente',
-      data: schedule,
+      message: 'Horario editado exitosamente',
+      data: result,
     };
   }
 
