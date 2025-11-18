@@ -15,6 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { MedicalRecordsService } from './medical-records.service';
@@ -192,7 +193,7 @@ export class MedicalRecordsController {
     return this.medicalRecordsService.confirmAttachment(id, user.userId, dto);
   }
 
-  @Get(':id/attachments/:key/download-url')
+  @Get(':id/download')
   @Roles('DOCTOR', 'PATIENT')
   @ApiOperation({
     summary: 'Generar URL para descargar archivo adjunto',
@@ -200,7 +201,7 @@ export class MedicalRecordsController {
       'Genera una URL prefirmada de S3 para descargar un archivo adjunto del expediente.',
   })
   @ApiParam({ name: 'id', description: 'ID del expediente' })
-  @ApiParam({ name: 'key', description: 'Key de S3 del archivo' })
+  @ApiQuery({ name: 'key', description: 'Key de S3 del archivo' })
   @ApiResponse({
     status: 200,
     description: 'URL generada',
@@ -211,7 +212,7 @@ export class MedicalRecordsController {
   async generateDownloadUrl(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,
-    @Param('key') key: string,
+    @Query('key') key: string,
   ): Promise<DownloadUrlResponseDto> {
     return this.medicalRecordsService.generateDownloadUrl(
       id,
