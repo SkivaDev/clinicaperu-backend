@@ -1012,7 +1012,7 @@ async function main() {
       dayOfWeek: 2, // Martes
       startTime: '08:00',
       endTime: '12:00',
-      slotMinutes: 40,
+      slotMinutes: 45,
       doctorId: doctor10.id,
     },
   });
@@ -1022,7 +1022,17 @@ async function main() {
       dayOfWeek: 4, // Jueves
       startTime: '14:00',
       endTime: '18:00',
-      slotMinutes: 40,
+      slotMinutes: 45,
+      doctorId: doctor10.id,
+    },
+  });
+
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 6, // Sábado
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: 45,
       doctorId: doctor10.id,
     },
   });
@@ -1045,6 +1055,62 @@ async function main() {
       endTime: '19:00',
       slotMinutes: 45,
       doctorId: doctor11.id,
+    },
+  });
+
+  // ========== HORARIOS DE SÁBADO (cobertura de fin de semana) ==========
+  // Doctor 1 - Medicina General (sábado mañana - especialidad muy solicitada)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 6, // Sábado
+      startTime: '08:00',
+      endTime: '14:00',
+      slotMinutes: 30,
+      doctorId: doctor1.id,
+    },
+  });
+
+  // Doctor 2 - Pediatría (sábado mañana - padres trabajan entre semana)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 6, // Sábado
+      startTime: '09:00',
+      endTime: '13:00',
+      slotMinutes: 30,
+      doctorId: doctor2.id,
+    },
+  });
+
+  // Doctor 4 - Traumatología (sábado - lesiones deportivas)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 6, // Sábado
+      startTime: '08:00',
+      endTime: '12:00',
+      slotMinutes: 30,
+      doctorId: doctor4.id,
+    },
+  });
+
+  // Doctor 5 - Dermatología (turno tarde adicional entre semana)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 4, // Jueves
+      startTime: '16:00',
+      endTime: '20:00',
+      slotMinutes: 30,
+      doctorId: doctor5.id,
+    },
+  });
+
+  // Doctor 6 - Oftalmología (turno tarde adicional)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 3, // Miércoles
+      startTime: '15:00',
+      endTime: '19:00',
+      slotMinutes: 20,
+      doctorId: doctor6.id,
     },
   });
 
@@ -1138,9 +1204,9 @@ async function main() {
     return totalSlotsCreated;
   }
 
-  // Generar slots para los próximos 14 días
-  const slotsCreated = await generateSlotsForSchedules(14);
-  console.log(`✅ ${slotsCreated} slots generados para los próximos 14 días`);
+  // Generar slots para los próximos 30 días (sistema ya en funcionamiento)
+  const slotsCreated = await generateSlotsForSchedules(30);
+  console.log(`✅ ${slotsCreated} slots generados para los próximos 30 días`);
 
   // ====================== APPOINTMENTS ======================
   const patient = await prisma.user.findFirst({
@@ -1968,16 +2034,279 @@ async function main() {
   }
 
   console.log('✅ Pagos creados con diferentes estados (COMPLETED, PENDING)');
+
+  // ====================== DATOS HISTÓRICOS (Sistema ya en funcionamiento) ======================
+  console.log(
+    '\n📚 Creando datos históricos para dar apariencia de sistema en uso...',
+  );
+
+  // Crear schedules históricos que ya no están activos (cambios pasados)
+  await prisma.schedule.create({
+    data: {
+      dayOfWeek: 2, // Martes
+      startTime: '14:00',
+      endTime: '18:00',
+      slotMinutes: 30,
+      doctorId: doctor1.id,
+      isActive: false, // Ya no está activo
+      effectiveFrom: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // Hace 3 meses
+      effectiveTo: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Hasta hace 1 mes
+    },
+  });
+
+  // Crear citas ATTENDED de hace 1-3 meses (historial médico)
+  const historicalAppointments: any[] = [];
+
+  // Cita histórica 1: Hace 45 días
+  const slot45DaysAgo = await prisma.slot.create({
+    data: {
+      scheduleId: schedule1.id,
+      startAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000 + 30 * 60000),
+      status: 'BOOKED',
+      isActive: true,
+    },
+  });
+
+  const apt45Days = await prisma.appointment.create({
+    data: {
+      userId: patient2.id,
+      doctorId: doctor1.id,
+      slotId: slot45DaysAgo.id,
+      status: 'ATTENDED',
+      reason: 'Control de presión arterial',
+      notes: 'Hipertensión controlada con medicación',
+      confirmedAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000),
+      attendedAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+    },
+  });
+  historicalAppointments.push(apt45Days);
+
+  // Crear expediente médico histórico
+  await prisma.medicalRecord.create({
+    data: {
+      appointmentId: apt45Days.id,
+      recordType: 'FOLLOW_UP',
+      diagnosis: 'Hipertensión arterial grado 1 controlada',
+      prescription: 'Enalapril 10mg c/24h. Control en 3 meses.',
+      notes: 'PA: 130/85. Paciente adherente a tratamiento.',
+      vitalSigns: {
+        bloodPressure: '130/85',
+        heartRate: 70,
+        temperature: 36.6,
+        weight: 78,
+        height: 170,
+      },
+      createdById: doctor1User.id,
+    },
+  });
+
+  // Cita histórica 2: Hace 60 días
+  const slot60DaysAgo = await prisma.slot.create({
+    data: {
+      scheduleId: schedule1.id,
+      startAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000 + 30 * 60000),
+      status: 'BOOKED',
+      isActive: true,
+    },
+  });
+
+  const apt60Days = await prisma.appointment.create({
+    data: {
+      userId: patient3.id,
+      doctorId: doctor2.id,
+      slotId: slot60DaysAgo.id,
+      status: 'ATTENDED',
+      reason: 'Vacunación infantil - refuerzo',
+      notes: 'Vacuna triple viral aplicada',
+      confirmedAt: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000),
+      attendedAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+    },
+  });
+  historicalAppointments.push(apt60Days);
+
+  // Cita histórica 3: Hace 75 días
+  const slot75DaysAgo = await prisma.slot.create({
+    data: {
+      scheduleId: schedule1.id,
+      startAt: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000 + 45 * 60000),
+      status: 'BOOKED',
+      isActive: true,
+    },
+  });
+
+  const apt75Days = await prisma.appointment.create({
+    data: {
+      userId: patient4.id,
+      doctorId: doctor3.id,
+      slotId: slot75DaysAgo.id,
+      status: 'ATTENDED',
+      reason: 'Control prenatal - segundo trimestre',
+      notes: 'Ecografía morfológica normal',
+      confirmedAt: new Date(Date.now() - 80 * 24 * 60 * 60 * 1000),
+      attendedAt: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000),
+    },
+  });
+  historicalAppointments.push(apt75Days);
+
+  await prisma.medicalRecord.create({
+    data: {
+      appointmentId: apt75Days.id,
+      recordType: 'FOLLOW_UP',
+      diagnosis: 'Embarazo de 20 semanas, evolución normal',
+      prescription:
+        'Hierro 300mg/día. Ácido fólico 1mg/día. Control en 4 semanas.',
+      notes:
+        'Feto único, FCF 145 lpm. Placenta normoinserta. LA normal. Peso materno +6kg.',
+      vitalSigns: {
+        bloodPressure: '110/70',
+        heartRate: 80,
+        temperature: 36.7,
+        weight: 68,
+        height: 162,
+      },
+      createdById: doctor3User.id,
+    },
+  });
+
+  // Cita histórica 4: Hace 90 días (cancelada)
+  const slot90DaysAgo = await prisma.slot.create({
+    data: {
+      scheduleId: schedule1.id,
+      startAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000 + 30 * 60000),
+      status: 'FREE',
+      isActive: true,
+    },
+  });
+
+  await prisma.appointment.create({
+    data: {
+      userId: patient5.id,
+      doctorId: doctor4.id,
+      slotId: slot90DaysAgo.id,
+      status: 'CANCELLED',
+      reason: 'Dolor de rodilla',
+      notes: 'Paciente canceló - viaje de trabajo',
+      cancelledAt: new Date(Date.now() - 92 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  // Crear pagos históricos para las citas atendidas
+  for (const apt of historicalAppointments) {
+    const attendedDate = apt.attendedAt ? new Date(apt.attendedAt) : new Date();
+    await prisma.payment.create({
+      data: {
+        appointmentId: apt.id,
+        amount: 150,
+        currency: 'PEN',
+        paymentMethod: 'SIMULATED_CARD',
+        status: 'COMPLETED',
+        transactionId: `TXN-HIST-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        metadata: {
+          historical: true,
+          note: 'Pago histórico del sistema',
+        },
+        paidAt: attendedDate,
+      },
+    });
+  }
+
+  // Unavailabilities históricas (pasadas)
+  await prisma.doctorUnavailability.create({
+    data: {
+      doctorId: doctor1.id,
+      startAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 53 * 24 * 60 * 60 * 1000),
+      reason: 'Vacaciones (históricas)',
+    },
+  });
+
+  await prisma.doctorUnavailability.create({
+    data: {
+      doctorId: doctor3.id,
+      startAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+      endAt: new Date(Date.now() - 44 * 24 * 60 * 60 * 1000),
+      reason: 'Congreso médico internacional',
+    },
+  });
+
+  // Emails históricos
+  await prisma.emailMessage.createMany({
+    data: [
+      {
+        to: patient2.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient2.firstName} ${patient2.lastName}`,
+          doctorName: 'Dr. Carlos Ramírez',
+          date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Medicina General',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000),
+      },
+      {
+        to: patient3.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient3.firstName} ${patient3.lastName}`,
+          doctorName: 'Dra. María Gómez',
+          date: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Pediatría',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000),
+      },
+      {
+        to: patient4.email,
+        subject: 'Confirmación de cita médica',
+        template: 'BOOKING_CONFIRMATION',
+        variables: {
+          patientName: `${patient4.firstName} ${patient4.lastName}`,
+          doctorName: 'Dra. Laura Fernández',
+          date: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000).toISOString(),
+          specialty: 'Ginecología',
+        },
+        status: 'SENT',
+        attempts: 1,
+        sentAt: new Date(Date.now() - 80 * 24 * 60 * 60 * 1000),
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log('✅ Datos históricos creados:');
+  console.log(
+    `   - ${historicalAppointments.length} citas atendidas hace 1-3 meses`,
+  );
+  console.log(
+    `   - ${historicalAppointments.length} pagos completados históricos`,
+  );
+  console.log('   - 2 expedientes médicos de citas pasadas');
+  console.log('   - 2 unavailabilities históricas');
+  console.log('   - 3 emails de confirmación históricos');
+  console.log('   - 1 schedule inactivo (cambio histórico de horario)');
 }
 
-void main()
+main()
   .then(() => {
     console.log(
-      '✅ Seed ejecutado con éxito: Clínica San Pablo Perú inicializada',
+      '\n✅ Seed ejecutado con éxito: Clínica San Pablo Perú inicializada',
     );
+    console.log('📊 Sistema preparado con datos históricos y actuales');
+    console.log('🏥 Listo para despliegue en producción');
   })
   .catch((e) => {
     console.error('❌ Error ejecutando seed:', e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

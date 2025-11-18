@@ -46,6 +46,20 @@ export class SchedulesService {
     // 2. Validar solapamientos
     this.validateNoOverlappingSchedules(schedules);
 
+    for (const schedule of schedules) {
+      this.validateTimeRange(schedule.startTime, schedule.endTime);
+      this.validateSlotDuration(
+        schedule.startTime,
+        schedule.endTime,
+        schedule.slotMinutes,
+      );
+      this.validateClinicHours(
+        schedule.dayOfWeek,
+        schedule.startTime,
+        schedule.endTime,
+      );
+    }
+
     // 3. Transacción para actualizar todo
     return await this.prisma.$transaction(async (tx) => {
       // Marcar horarios existentes como inactivos (soft delete)
@@ -584,6 +598,7 @@ export class SchedulesService {
 
     // Validate time logic
     this.validateTimeRange(dto.startTime, dto.endTime);
+    this.validateClinicHours(dto.dayOfWeek, dto.startTime, dto.endTime);
     this.validateSlotDuration(dto.startTime, dto.endTime, dto.slotMinutes);
     this.validateEffectiveDates(dto.effectiveFrom, dto.effectiveTo);
 
@@ -764,7 +779,12 @@ export class SchedulesService {
       const startTime = dto.startTime || existingSchedule.startTime;
       const endTime = dto.endTime || existingSchedule.endTime;
       const slotMinutes = dto.slotMinutes || existingSchedule.slotMinutes;
+      const dayOfWeek =
+        dto.dayOfWeek !== undefined
+          ? dto.dayOfWeek
+          : existingSchedule.dayOfWeek;
       this.validateSlotDuration(startTime, endTime, slotMinutes);
+      this.validateClinicHours(dayOfWeek, startTime, endTime);
     }
 
     if (dto.effectiveFrom || dto.effectiveTo) {
@@ -883,6 +903,37 @@ export class SchedulesService {
     if (startMinutes >= endMinutes) {
       throw new BadRequestException(
         'La hora de inicio debe ser menor que la hora de fin',
+      );
+    }
+  }
+
+  private validateClinicHours(
+    dayOfWeek: number,
+    startTime: string,
+    endTime: string,
+  ): void {
+    if (
+      !this.scheduleConfig.CLINIC_WORKING_DAYS.includes(
+        dayOfWeek as (typeof this.scheduleConfig.CLINIC_WORKING_DAYS)[number],
+      )
+    ) {
+      throw new BadRequestException(
+        'El día seleccionado está fuera del horario de atención de la clínica',
+      );
+    }
+
+    const clinicOpenMinutes = this.timeToMinutes(
+      this.scheduleConfig.CLINIC_OPEN_TIME,
+    );
+    const clinicCloseMinutes = this.timeToMinutes(
+      this.scheduleConfig.CLINIC_CLOSE_TIME,
+    );
+    const startMinutes = this.timeToMinutes(startTime);
+    const endMinutes = this.timeToMinutes(endTime);
+
+    if (startMinutes < clinicOpenMinutes || endMinutes > clinicCloseMinutes) {
+      throw new BadRequestException(
+        `El horario debe estar dentro del horario de atención de la clínica (${this.scheduleConfig.CLINIC_OPEN_TIME} - ${this.scheduleConfig.CLINIC_CLOSE_TIME})`,
       );
     }
   }

@@ -52,6 +52,9 @@ export class SchedulesController {
     minSlotGenerationWeeks: number;
     defaultSlotDurations: number[];
     maxSchedulesPerDay: number;
+    clinicOpenTime: string;
+    clinicCloseTime: string;
+    clinicWorkingDays: number[];
   }> {
     const config = getScheduleConfig();
     return {
@@ -64,6 +67,9 @@ export class SchedulesController {
         minSlotGenerationWeeks: config.MIN_SLOT_GENERATION_WEEKS,
         defaultSlotDurations: [...config.DEFAULT_SLOT_DURATIONS],
         maxSchedulesPerDay: config.MAX_SCHEDULES_PER_DAY,
+        clinicOpenTime: config.CLINIC_OPEN_TIME,
+        clinicCloseTime: config.CLINIC_CLOSE_TIME,
+        clinicWorkingDays: [...config.CLINIC_WORKING_DAYS],
       },
     };
   }

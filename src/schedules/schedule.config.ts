@@ -23,10 +23,15 @@ export const SCHEDULE_CONFIG = {
 
   // Timezone offset (in hours) - adjust based on your server location
   TIMEZONE_OFFSET: 0, // UTC by default
+
+  CLINIC_OPEN_TIME: '08:00',
+  CLINIC_CLOSE_TIME: '20:00',
+  CLINIC_WORKING_DAYS: [1, 2, 3, 4, 5, 6] as number[],
 } as const;
 
 /**
  * Environment-based configuration
+ * Allows overriding clinic hours and working days via environment variables
  */
 export const getScheduleConfig = () => {
   const weeksAhead = process.env.SLOT_GENERATION_WEEKS
@@ -46,8 +51,45 @@ export const getScheduleConfig = () => {
     );
   }
 
+  // Allow overriding clinic hours via environment variables
+  const clinicOpenTime =
+    process.env.CLINIC_OPEN_TIME || SCHEDULE_CONFIG.CLINIC_OPEN_TIME;
+  const clinicCloseTime =
+    process.env.CLINIC_CLOSE_TIME || SCHEDULE_CONFIG.CLINIC_CLOSE_TIME;
+
+  // Allow overriding working days via environment variable (comma-separated, e.g., "1,2,3,4,5,6")
+  const clinicWorkingDays = process.env.CLINIC_WORKING_DAYS
+    ? process.env.CLINIC_WORKING_DAYS.split(',').map((d) => parseInt(d.trim()))
+    : SCHEDULE_CONFIG.CLINIC_WORKING_DAYS;
+
+  // Validate time format (HH:mm)
+  const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  if (!timeRegex.test(clinicOpenTime)) {
+    throw new Error(
+      `CLINIC_OPEN_TIME must be in HH:mm format, got: ${clinicOpenTime}`,
+    );
+  }
+  if (!timeRegex.test(clinicCloseTime)) {
+    throw new Error(
+      `CLINIC_CLOSE_TIME must be in HH:mm format, got: ${clinicCloseTime}`,
+    );
+  }
+
+  // Validate working days (must be 0-6)
+  if (
+    !Array.isArray(clinicWorkingDays) ||
+    clinicWorkingDays.some((d) => d < 0 || d > 6)
+  ) {
+    throw new Error(
+      `CLINIC_WORKING_DAYS must be an array of numbers 0-6, got: ${JSON.stringify(clinicWorkingDays)}`,
+    );
+  }
+
   return {
     ...SCHEDULE_CONFIG,
     SLOT_GENERATION_WEEKS: weeksAhead,
+    CLINIC_OPEN_TIME: clinicOpenTime,
+    CLINIC_CLOSE_TIME: clinicCloseTime,
+    CLINIC_WORKING_DAYS: clinicWorkingDays,
   };
 };
