@@ -1446,4 +1446,102 @@ export class DoctorsService {
       upcomingAppointments,
     };
   }
+
+  // ===========================================================================
+  // DASHBOARD STATS FOR DOCTOR
+  // ===========================================================================
+  async getDashboardStats(userId: string) {
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { userId },
+      select: { id: true, rating: true, attendedPatients: true },
+    });
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor profile not found');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const appointmentsToday = await this.prisma.appointment.count({
+      where: {
+        doctorId: doctor.id,
+        slot: {
+          startAt: { gte: today, lt: tomorrow },
+        },
+        status: { notIn: ['CANCELLED'] },
+      },
+    });
+
+    const pendingReports = await this.prisma.appointment.count({
+      where: {
+        doctorId: doctor.id,
+        status: 'ATTENDED',
+        medicalRecord: null,
+      },
+    });
+
+    return {
+      appointmentsToday,
+      pendingReports,
+      totalPatients: doctor.attendedPatients,
+      rating: doctor.rating,
+    };
+  }
+
+  // ===========================================================================
+  // RECENT PATIENTS FOR DOCTOR
+  // ===========================================================================
+  async getRecentPatients(userId: string) {
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor profile not found');
+    }
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Get distinct patients from recent appointments
+    const recentAppointments = await this.prisma.appointment.findMany({
+      where: {
+        doctorId: doctor.id,
+        status: 'ATTENDED',
+        attendedAt: { gte: thirtyDaysAgo },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            profileImage: true,
+            gender: true,
+          },
+        },
+      },
+      orderBy: {
+        attendedAt: 'desc',
+      },
+      take: 20, // Get more to ensure we have enough unique patients
+    });
+
+    // Get unique patients (deduplicate by userId)
+    const uniquePatientsMap = new Map();
+    for (const appointment of recentAppointments) {
+      if (!uniquePatientsMap.has(appointment.user.id)) {
+        uniquePatientsMap.set(appointment.user.id, appointment.user);
+      }
+    }
+
+    // Return up to 5 unique patients
+    return Array.from(uniquePatientsMap.values()).slice(0, 5);
+  }
 }

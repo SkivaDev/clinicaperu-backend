@@ -119,4 +119,58 @@ export class DoctorStatisticsController {
       data: statistics,
     };
   }
+
+  /**
+   * GET /doctors/statistics/dashboard - Obtener estadísticas del dashboard
+   * Métricas rápidas para el dashboard del doctor
+   */
+  @Get('dashboard')
+  @UseInterceptors(new CacheInterceptor(60000)) // 1 minuto = 60000ms
+  @ApiOperation({
+    summary: 'Obtener estadísticas del dashboard',
+    description:
+      'Obtiene métricas rápidas para el dashboard: citas de hoy, reportes pendientes, total de pacientes y calificación. Cache de 1 minuto.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Estadísticas del dashboard obtenidas exitosamente',
+  })
+  async getDashboardStats(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<any>> {
+    const stats = await this.doctorsService.getDashboardStats(user.userId);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Estadísticas del dashboard obtenidas exitosamente',
+      data: stats,
+    };
+  }
+
+  /**
+   * GET /doctors/statistics/recent-patients - Obtener pacientes recientes
+   * Lista de pacientes atendidos recientemente (últimos 30 días)
+   */
+  @Get('recent-patients')
+  @UseInterceptors(new CacheInterceptor(300000)) // 5 minutos = 300000ms
+  @ApiOperation({
+    summary: 'Obtener pacientes recientes',
+    description:
+      'Obtiene la lista de pacientes atendidos recientemente (últimos 30 días). Cache de 5 minutos.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pacientes recientes obtenidos exitosamente',
+  })
+  async getRecentPatients(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<any>> {
+    const patients = await this.doctorsService.getRecentPatients(user.userId);
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Pacientes recientes obtenidos exitosamente',
+      data: patients,
+    };
+  }
 }

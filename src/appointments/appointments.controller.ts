@@ -223,6 +223,36 @@ export class AppointmentsController {
   }
 
   /**
+   * Listar citas de hoy
+   * GET /appointments/today
+   * Obtiene las citas del día actual del doctor autenticado
+   */
+  @Get('today')
+  @Roles(Role.DOCTOR)
+  @ApiOperation({
+    summary: 'Listar citas de hoy',
+    description:
+      'Obtiene las citas del día actual del doctor autenticado, ordenadas por hora de inicio.',
+  })
+  @ApiOkResponse({
+    description: 'Lista de citas de hoy obtenida exitosamente',
+  })
+  async getTodayAppointments(
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ResponseDto<any[]>> {
+    const appointments = await this.appointmentsService.getTodayAppointments(
+      user.userId,
+      user.role,
+    );
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Today appointments retrieved successfully',
+      data: appointments,
+    };
+  }
+
+  /**
    * Confirma una cita que está en estado PENDING
    * Solo el paciente propietario puede confirmar su cita
    */

@@ -653,4 +653,101 @@ export class AppointmentsService {
       return updatedAppointment;
     });
   }
+
+  /**
+   * Obtiene las citas del día actual para un doctor
+   */
+  async getTodayAppointments(userId: string, userRole: Role): Promise<any[]> {
+    let whereClause: any = {};
+
+    if (userRole === Role.DOCTOR) {
+      // Doctor: obtener su doctorId y filtrar por sus citas
+      const doctor = await this.prisma.doctor.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!doctor) {
+        throw new BadRequestException('Doctor profile not found');
+      }
+
+      whereClause = { doctorId: doctor.id };
+    } else {
+      throw new ForbiddenException('Only doctors can access this endpoint');
+    }
+
+    // Filtrar por el día de hoy
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    whereClause.slot = {
+      startAt: {
+        gte: today,
+        lt: tomorrow,
+      },
+    };
+
+    const appointments = await this.prisma.appointment.findMany({
+      where: whereClause,
+      include: {
+        slot: {
+          select: {
+            id: true,
+            startAt: true,
+            endAt: true,
+            status: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            dni: true,
+            profileImage: true,
+          },
+        },
+        doctor: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                profileImage: true,
+              },
+            },
+            specialty: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            clinic: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
+          },
+        },
+        medicalRecord: {
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: {
+        slot: {
+          startAt: 'asc',
+        },
+      },
+    });
+
+    return appointments;
+  }
 }
