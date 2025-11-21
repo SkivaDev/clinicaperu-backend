@@ -22,6 +22,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { PaymentsModule } from './payments/payments.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
 import { AvailabilityModule } from './availability/availability.module';
+import { ReportsModule } from './reports/reports.module';
 
 // ✅ NUEVO: Módulo centralizado de colas
 import { QueueModule } from './queue/queue.module';
@@ -89,6 +90,7 @@ const emailModules =
     UploadsModule, // HU-028: Módulo para subir archivos a S3
     PaymentsModule, // HU-030: Módulo de pagos simulado
     MedicalRecordsModule, // HU-031: Módulo de expedientes médicos
+    ReportsModule, // HU-035: Módulo de reportes y analíticas
 
     // Módulos de trabajos asíncronos (usan QueueModule)
     ...emailModules,
