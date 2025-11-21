@@ -170,6 +170,14 @@ export class CreateDoctorDto {
   @IsString()
   gender: Gender;
 
+  @ApiPropertyOptional({
+    description: 'URL de la imagen del perfil del doctor',
+    example: 'https://example.com/profile-image.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  profileImage?: string;
+
   // ===========================================================================
   // 🧑‍⚕️ DATOS PROFESIONALES DEL DOCTOR
   // ===========================================================================

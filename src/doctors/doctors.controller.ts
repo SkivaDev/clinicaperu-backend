@@ -20,7 +20,6 @@ import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiUnauthorizedResponse,
-  ApiCreatedResponse,
   ApiOkResponse,
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
@@ -29,7 +28,6 @@ import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { ResponseDto } from 'src/common/dto/response.dto';
 import { DoctorIdDto } from './dto/doctor-id.dto';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -38,7 +36,6 @@ import {
   CanDeactivateDoctorResponseDto,
   DoctorResponseDto,
 } from './dto/doctor-response.dto';
-import { UpdateUserDto } from 'src/users/dto/update-user.dto';
 import { DoctorDeactivateGuard } from './guards/doctor-deactivate.guard';
 import { QueryDoctorDto } from './dto/query-doctor.dto';
 
@@ -128,11 +125,12 @@ export class DoctorsController {
     @Param('id') id: string,
   ): Promise<ResponseDto<DoctorResponseDto>> {
     const doctor = await this.doctorsService.getDoctorById(id);
-
+    // const doctorStats = await this.doctorsService.getDoctorStats(id);
     return {
       statusCode: HttpStatus.OK,
       message: 'Doctor encontrado exitosamente',
       data: doctor,
+      // stats: doctorStats,
     };
   }
 

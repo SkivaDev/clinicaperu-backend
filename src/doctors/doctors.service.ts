@@ -282,6 +282,16 @@ export class DoctorsService {
     };
   }
 
+  // async getDoctorStats(id: string) {
+  //   const doctor = await this.prisma.doctor.findUnique({
+  //     where: { id },
+  //   });
+  //   if (!doctor) throw new NotFoundException('Doctor not found');
+  //   return {
+
+  //   };
+  // }
+
   async getDoctorIds(id: string) {
     const doctor = await this.prisma.doctor.findUnique({
       where: { id },
@@ -445,13 +455,30 @@ export class DoctorsService {
         ...(dto.dayOfBirth !== undefined && {
           dayOfBirth: new Date(dto.dayOfBirth),
         }),
+        ...(dto.gender !== undefined && { gender: dto.gender }),
+        ...(dto.profileImage !== undefined && {
+          profileImage: dto.profileImage,
+        }),
       },
     });
 
-    await this.prisma.doctor.update({
-      where: { id },
-      data: dto,
-    });
+    // Actualizar solo los campos que pertenecen a Doctor
+    const doctorData: any = {};
+    if (dto.cmp !== undefined) doctorData.cmp = dto.cmp;
+    if (dto.isActive !== undefined) doctorData.isActive = dto.isActive;
+    if (dto.yearsOfExperience !== undefined)
+      doctorData.yearsOfExperience = dto.yearsOfExperience;
+    if (dto.consultationPrice !== undefined)
+      doctorData.consultationPrice = dto.consultationPrice;
+    if (dto.specialtyId !== undefined) doctorData.specialtyId = dto.specialtyId;
+    if (dto.clinicId !== undefined) doctorData.clinicId = dto.clinicId;
+
+    if (Object.keys(doctorData).length > 0) {
+      await this.prisma.doctor.update({
+        where: { id },
+        data: doctorData,
+      });
+    }
 
     return this.getDoctorById(id);
   }
