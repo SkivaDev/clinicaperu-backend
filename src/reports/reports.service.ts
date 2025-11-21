@@ -6,7 +6,12 @@ import {
   RevenueChartQueryDto,
   RecentActivityQueryDto,
 } from './dto/query-reports.dto';
-import { AppointmentStatus, PaymentStatus, SlotStatus, PaymentMethod } from '@prisma/client';
+import {
+  AppointmentStatus,
+  PaymentStatus,
+  SlotStatus,
+  PaymentMethod,
+} from '@prisma/client';
 import { subMonths, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -18,8 +23,10 @@ export class ReportsService {
   private calculatePreviousPeriod(startDate: string, endDate: string) {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
+    const diffDays = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
     return {
       start: subMonths(start, 1),
       end: subMonths(end, 1),
@@ -67,7 +74,10 @@ export class ReportsService {
       _sum: { amount: true },
     });
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const previousRevenue = await this.prisma.payment.aggregate({
       where: {
         status: PaymentStatus.COMPLETED,
@@ -97,7 +107,10 @@ export class ReportsService {
       where: this.buildAppointmentWhereClause(filters),
     });
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const previous = await this.prisma.appointment.count({
       where: {
         createdAt: {
@@ -148,7 +161,10 @@ export class ReportsService {
 
     const rate = totalSlots > 0 ? (bookedSlots / totalSlots) * 100 : 0;
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const prevTotal = await this.prisma.slot.count({
       where: {
         startAt: { gte: previousPeriod.start, lte: previousPeriod.end },
@@ -190,9 +206,13 @@ export class ReportsService {
       where: { role: 'PATIENT' },
     });
 
-    const percentage = totalPatients > 0 ? (newPatients / totalPatients) * 100 : 0;
+    const percentage =
+      totalPatients > 0 ? (newPatients / totalPatients) * 100 : 0;
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const prevNew = await this.prisma.user.count({
       where: {
         role: 'PATIENT',
@@ -235,7 +255,10 @@ export class ReportsService {
 
     const rate = total > 0 ? (cancelled / total) * 100 : 0;
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const prevTotal = await this.prisma.appointment.count({
       where: {
         createdAt: { gte: previousPeriod.start, lte: previousPeriod.end },
@@ -261,26 +284,28 @@ export class ReportsService {
 
   // KPI: Retention Rate
   async getRetentionRate(filters: QueryReportsDto) {
-    const patientsWithMultipleAppointments = await this.prisma.appointment.groupBy({
-      by: ['userId'],
-      where: this.buildAppointmentWhereClause(filters),
-      having: {
-        userId: {
-          _count: {
-            gt: 1,
+    const patientsWithMultipleAppointments =
+      await this.prisma.appointment.groupBy({
+        by: ['userId'],
+        where: this.buildAppointmentWhereClause(filters),
+        having: {
+          userId: {
+            _count: {
+              gt: 1,
+            },
           },
         },
-      },
-    });
+      });
 
     const totalPatients = await this.prisma.appointment.groupBy({
       by: ['userId'],
       where: this.buildAppointmentWhereClause(filters),
     });
 
-    const rate = totalPatients.length > 0 
-      ? (patientsWithMultipleAppointments.length / totalPatients.length) * 100 
-      : 0;
+    const rate =
+      totalPatients.length > 0
+        ? (patientsWithMultipleAppointments.length / totalPatients.length) * 100
+        : 0;
 
     return {
       value: Number(rate.toFixed(0)),
@@ -297,7 +322,10 @@ export class ReportsService {
       where: this.buildAppointmentWhereClause(filters),
     });
 
-    const previousPeriod = this.calculatePreviousPeriod(filters.startDate, filters.endDate);
+    const previousPeriod = this.calculatePreviousPeriod(
+      filters.startDate,
+      filters.endDate,
+    );
     const prevActive = await this.prisma.appointment.groupBy({
       by: ['userId'],
       where: {
@@ -305,7 +333,10 @@ export class ReportsService {
       },
     });
 
-    const growth = this.calculateGrowth(activePatients.length, prevActive.length);
+    const growth = this.calculateGrowth(
+      activePatients.length,
+      prevActive.length,
+    );
 
     return {
       value: activePatients.length,
@@ -384,23 +415,39 @@ export class ReportsService {
 
   // Appointment Stats
   async getAppointmentStats(filters: QueryReportsDto) {
-    const [completed, pending, confirmed, cancelled, noShow] = await Promise.all([
-      this.prisma.appointment.count({
-        where: { ...this.buildAppointmentWhereClause(filters), status: AppointmentStatus.ATTENDED },
-      }),
-      this.prisma.appointment.count({
-        where: { ...this.buildAppointmentWhereClause(filters), status: AppointmentStatus.PENDING },
-      }),
-      this.prisma.appointment.count({
-        where: { ...this.buildAppointmentWhereClause(filters), status: AppointmentStatus.CONFIRMED },
-      }),
-      this.prisma.appointment.count({
-        where: { ...this.buildAppointmentWhereClause(filters), status: AppointmentStatus.CANCELLED },
-      }),
-      this.prisma.appointment.count({
-        where: { ...this.buildAppointmentWhereClause(filters), status: AppointmentStatus.NO_SHOW },
-      }),
-    ]);
+    const [completed, pending, confirmed, cancelled, noShow] =
+      await Promise.all([
+        this.prisma.appointment.count({
+          where: {
+            ...this.buildAppointmentWhereClause(filters),
+            status: AppointmentStatus.ATTENDED,
+          },
+        }),
+        this.prisma.appointment.count({
+          where: {
+            ...this.buildAppointmentWhereClause(filters),
+            status: AppointmentStatus.PENDING,
+          },
+        }),
+        this.prisma.appointment.count({
+          where: {
+            ...this.buildAppointmentWhereClause(filters),
+            status: AppointmentStatus.CONFIRMED,
+          },
+        }),
+        this.prisma.appointment.count({
+          where: {
+            ...this.buildAppointmentWhereClause(filters),
+            status: AppointmentStatus.CANCELLED,
+          },
+        }),
+        this.prisma.appointment.count({
+          where: {
+            ...this.buildAppointmentWhereClause(filters),
+            status: AppointmentStatus.NO_SHOW,
+          },
+        }),
+      ]);
 
     const pendingTotal = pending + confirmed;
     const total = completed + pendingTotal + cancelled + noShow;
@@ -473,7 +520,9 @@ export class ReportsService {
       };
     });
 
-    const sorted = doctorsWithStats.sort((a, b) => b.patientsCount - a.patientsCount);
+    const sorted = doctorsWithStats.sort(
+      (a, b) => b.patientsCount - a.patientsCount,
+    );
 
     return {
       doctors: sorted.slice(0, query.limit || 10),
@@ -519,30 +568,304 @@ export class ReportsService {
     return { activities };
   }
 
-  // Continue in next message due to length...
+  // Operational Analytics
   async getOperationalAnalytics(filters: QueryReportsDto) {
-    return {
-      heatmap: [],
-      funnel: [],
-      cancellations: [],
+    // Heatmap: Citas por hora y día de la semana
+    const appointments = await this.prisma.appointment.findMany({
+      where: this.buildAppointmentWhereClause(filters),
+      include: {
+        slot: true,
+      },
+    });
+
+    // Inicializar heatmap con 0
+    const hours = Array.from(
+      { length: 12 },
+      (_, i) => `${String(8 + i).padStart(2, '0')}:00`,
+    );
+    const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const heatmapData = hours.map((hour) => {
+      const row: any = { hour };
+      days.forEach((day) => (row[day] = 0));
+      return row;
+    });
+
+    // Llenar heatmap con datos reales
+    appointments.forEach((apt) => {
+      if (apt.slot?.startAt) {
+        const date = new Date(apt.slot.startAt);
+        const hour = date.getHours();
+        const dayOfWeek = date.getDay(); // 0=domingo, 1=lunes, ...
+        const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const dayKey = dayMap[dayOfWeek];
+
+        if (hour >= 8 && hour < 20 && dayKey !== 'sun') {
+          const hourIndex = hour - 8;
+          if (heatmapData[hourIndex] && days.includes(dayKey)) {
+            heatmapData[hourIndex][dayKey]++;
+          }
+        }
+      }
+    });
+
+    // Funnel: Conversión de citas (Solicitadas -> Confirmadas -> Atendidas)
+    const [total, confirmed, attended] = await Promise.all([
+      this.prisma.appointment.count({
+        where: this.buildAppointmentWhereClause(filters),
+      }),
+      this.prisma.appointment.count({
+        where: {
+          ...this.buildAppointmentWhereClause(filters),
+          status: AppointmentStatus.CONFIRMED,
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          ...this.buildAppointmentWhereClause(filters),
+          status: AppointmentStatus.ATTENDED,
+        },
+      }),
+    ]);
+
+    const funnel = [
+      { stage: 'Solicitadas', count: total, fill: 'hsl(217, 91%, 60%)' },
+      {
+        stage: 'Confirmadas',
+        count: confirmed + attended,
+        fill: 'hsl(142, 76%, 36%)',
+      },
+      { stage: 'Atendidas', count: attended, fill: 'hsl(48, 96%, 53%)' },
+    ];
+
+    // Cancellations: Tendencia de cancelaciones por día de la semana
+    const cancelledAppointments = await this.prisma.appointment.findMany({
+      where: {
+        ...this.buildAppointmentWhereClause(filters),
+        status: AppointmentStatus.CANCELLED,
+      },
+      include: { slot: true },
+    });
+
+    const cancellationsByDay = {
+      Lun: 0,
+      Mar: 0,
+      Mié: 0,
+      Jue: 0,
+      Vie: 0,
+      Sáb: 0,
+      Dom: 0,
     };
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+    cancelledAppointments.forEach((apt) => {
+      if (apt.slot?.startAt) {
+        const dayOfWeek = new Date(apt.slot.startAt).getDay();
+        const dayName = dayNames[dayOfWeek];
+        cancellationsByDay[dayName]++;
+      }
+    });
+
+    const cancellations = Object.entries(cancellationsByDay).map(
+      ([day, count]) => ({
+        day,
+        count,
+      }),
+    );
+
+    return { heatmap: heatmapData, funnel, cancellations };
   }
 
+  // Financial Analytics
   async getFinancialAnalytics(filters: QueryReportsDto) {
+    const whereClause = {
+      status: PaymentStatus.COMPLETED,
+      paidAt: {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      },
+      ...(filters.paymentMethod && { paymentMethod: filters.paymentMethod }),
+    };
+
+    // Payment Methods
+    const paymentsByMethod = await this.prisma.payment.groupBy({
+      by: ['paymentMethod'],
+      where: whereClause,
+      _sum: { amount: true },
+      _count: true,
+    });
+
+    const methodColors = {
+      CASH: 'hsl(142, 76%, 36%)',
+      CARD: 'hsl(217, 91%, 60%)',
+      TRANSFER: 'hsl(48, 96%, 53%)',
+      INSURANCE: 'hsl(280, 84%, 60%)',
+    };
+
+    const totalAmount = paymentsByMethod.reduce(
+      (sum, p) => sum + Number(p._sum.amount || 0),
+      0,
+    );
+
+    const paymentMethods = paymentsByMethod.map((p) => {
+      const amount = Number(p._sum.amount || 0);
+      return {
+        name: p.paymentMethod,
+        value:
+          totalAmount > 0
+            ? Number(((amount / totalAmount) * 100).toFixed(1))
+            : 0,
+        amount,
+        color: methodColors[p.paymentMethod] || 'hsl(0, 0%, 50%)',
+      };
+    });
+
+    // Revenue by Specialty
+    const revenueBySpec = await this.prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        appointment: {
+          include: {
+            doctor: {
+              include: {
+                specialty: true,
+                user: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const specialtyRevenue = revenueBySpec.reduce(
+      (acc, payment) => {
+        const specialtyName =
+          payment.appointment?.doctor?.specialty?.name || 'Sin especialidad';
+        acc[specialtyName] = (acc[specialtyName] || 0) + Number(payment.amount);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const revenueBySpecialty = Object.entries(specialtyRevenue)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    // Top Doctors by Revenue
+    const doctorRevenue = revenueBySpec.reduce(
+      (acc, payment) => {
+        const doctorName = payment.appointment?.doctor
+          ? `Dr. ${payment.appointment.doctor.user.firstName} ${payment.appointment.doctor.user.lastName}`
+          : 'Sin doctor';
+        acc[doctorName] = (acc[doctorName] || 0) + Number(payment.amount);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const topDoctorsByRevenue = Object.entries(doctorRevenue)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    // Projection: Revenue by month (last 6 months)
+    const projection: { month: string; actual: number; projected: number }[] =
+      [];
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = subMonths(new Date(filters.endDate), i);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+      const monthRevenue = await this.prisma.payment.aggregate({
+        where: {
+          status: PaymentStatus.COMPLETED,
+          paidAt: {
+            gte: monthStart,
+            lt: monthEnd,
+          },
+        },
+        _sum: { amount: true },
+      });
+
+      projection.push({
+        month: format(monthStart, 'MMM', { locale: es }),
+        actual: Number(monthRevenue._sum.amount || 0),
+        projected: Number(monthRevenue._sum.amount || 0) * 1.1, // 10% projection
+      });
+    }
+
     return {
-      paymentMethods: [],
-      revenueBySpecialty: [],
-      topDoctorsByRevenue: [],
-      projection: [],
+      paymentMethods,
+      revenueBySpecialty,
+      topDoctorsByRevenue,
+      projection,
     };
   }
 
+  // Medical Analytics
   async getMedicalAnalytics(filters: QueryReportsDto) {
-    return {
-      topDiagnoses: [],
-      consultationTypes: [],
-      appointmentsBySpecialty: [],
-    };
+    // Top Diagnoses
+    const medicalRecords = await this.prisma.medicalRecord.findMany({
+      where: {
+        appointment: this.buildAppointmentWhereClause(filters),
+      },
+    });
+
+    const diagnosisCounts = medicalRecords.reduce(
+      (acc, record) => {
+        acc[record.diagnosis] = (acc[record.diagnosis] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const topDiagnoses = Object.entries(diagnosisCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Consultation Types (usando recordType del MedicalRecord)
+    const typeCounts = medicalRecords.reduce(
+      (acc, record) => {
+        acc[record.recordType] = (acc[record.recordType] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const maxValue = Math.max(...Object.values(typeCounts), 1);
+    const consultationTypes = Object.entries(typeCounts).map(
+      ([subject, value]) => ({
+        subject,
+        A: value,
+        fullMark: maxValue,
+      }),
+    );
+
+    // Appointments by Specialty
+    const appointmentsBySpec = await this.prisma.appointment.findMany({
+      where: this.buildAppointmentWhereClause(filters),
+      include: {
+        doctor: {
+          include: { specialty: true },
+        },
+      },
+    });
+
+    const specialtyCounts = appointmentsBySpec.reduce(
+      (acc, apt) => {
+        const specialtyName = apt.doctor?.specialty?.name || 'Sin especialidad';
+        acc[specialtyName] = (acc[specialtyName] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    const appointmentsBySpecialty = Object.entries(specialtyCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return { topDiagnoses, consultationTypes, appointmentsBySpecialty };
   }
 
   async getFilterOptions() {
