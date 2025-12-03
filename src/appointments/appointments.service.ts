@@ -68,6 +68,7 @@ export class AppointmentsService {
     const appointments = await this.prisma.appointment.findMany({
       where: whereClause,
       include: {
+        payment: true, // Incluir información de pago
         slot: {
           select: {
             id: true,

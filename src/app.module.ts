@@ -24,6 +24,9 @@ import { MedicalRecordsModule } from './medical-records/medical-records.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { ReportsModule } from './reports/reports.module';
 
+// ✅ NUEVO: Módulo de tareas programadas (cron jobs)
+import { TasksModule } from './tasks/tasks.module';
+
 // ✅ NUEVO: Módulo centralizado de colas
 import { QueueModule } from './queue/queue.module';
 
@@ -97,6 +100,9 @@ const emailModules =
     // NotificationModule,
     // PdfModule,
     // ReportModule,
+
+    // ✅ Tareas programadas (cron jobs para limpieza de slots expirados)
+    TasksModule,
   ],
   providers: [
     // ✅ SEGURIDAD: Rate limiting por IP (Railway + Cloudflare compatible)
