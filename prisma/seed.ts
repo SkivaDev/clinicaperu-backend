@@ -51,10 +51,11 @@ async function main() {
   // ========== PACIENTE ==========
   const patientPassword = await bcrypt.hash(SEED_PATIENT_PASSWORD, 10);
   await prisma.user.upsert({
-    where: { email: 'patient@example.com' },
+    where: { email: 'skiva7.dev@gmail.com' },
     update: {},
     create: {
-      email: 'patient@example.com',
+      // email: 'patient@example.com',
+      email: 'skiva7.dev@gmail.com',
       passwordHash: patientPassword,
       dni: '87654321',
       firstName: 'Juan',
