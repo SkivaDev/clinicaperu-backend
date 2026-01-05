@@ -26,6 +26,8 @@ export const QUEUE_NAMES = {
 
         if (redisUrl) {
           const url = new URL(redisUrl);
+          // Upstash requires TLS (rediss:// protocol)
+          const useTls = url.protocol === 'rediss:';
 
           return {
             connection: {
@@ -34,6 +36,7 @@ export const QUEUE_NAMES = {
               username: url.username || undefined,
               password: url.password || undefined,
               maxRetriesPerRequest: null, // Recomendado para BullMQ
+              tls: useTls ? {} : undefined, // Enable TLS for Upstash
             },
           };
         }

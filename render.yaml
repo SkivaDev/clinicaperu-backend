@@ -1,0 +1,68 @@
+# ==================================
+# Render Blueprint Configuration
+# ==================================
+# This file defines the infrastructure for Render deployment
+
+services:
+  # NestJS Backend Service
+  - type: web
+    name: clinicaperu-backend
+    runtime: docker
+    plan: free
+    region: oregon # Closest to US-East where Neon/Upstash are
+
+    # Docker configuration
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Health check endpoint
+    healthCheckPath: /api
+
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '3000'
+      - key: DATABASE_URL
+        sync: false # Configure manually with Neon connection string
+      - key: REDIS_URL
+        sync: false # Configure manually with Upstash Redis URL
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false # Your Vercel frontend URL
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: PAYMENT_SIMULATION_SUCCESS_RATE
+        value: '0.85'
+      - key: PAYMENT_SIMULATION_MIN_DELAY_MS
+        value: '1500'
+      - key: PAYMENT_SIMULATION_MAX_DELAY_MS
+        value: '3000'
+      - key: PAYMENT_SIMULATION_TIMEOUT_MS
+        value: '30000'
+      - key: PAYMENT_WEBHOOK_SECRET
+        generateValue: true
+      - key: PAYMENT_RATE_LIMIT_MAX_ATTEMPTS
+        value: '5'
+      - key: PAYMENT_RATE_LIMIT_WINDOW_SECONDS
+        value: '120'
+      - key: PAYMENT_HOLD_DURATION_MINUTES
+        value: '15'
+      - key: PAYMENT_REFUND_MIN_HOURS_BEFORE
+        value: '24'
+      - key: PAYMENT_DEFAULT_CURRENCY
+        value: PEN
