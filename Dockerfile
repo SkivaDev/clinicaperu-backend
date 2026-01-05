@@ -24,6 +24,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Generate Prisma client and build
+# Note: DATABASE_URL is only needed for schema validation, not actual connection
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
 RUN pnpm build
 
 # Stage 2: Production
@@ -58,5 +60,5 @@ USER nestjs
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api || exit 1
 
-# Run migrations and start
+# Run migrations and start server
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
