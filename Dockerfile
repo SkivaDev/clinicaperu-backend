@@ -60,6 +60,5 @@ USER nestjs
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api || exit 1
 
-# Run migrations (continue even if they fail, migrations may already be applied)
-# Then start the server
-CMD ["sh", "-c", "npx prisma migrate deploy || echo 'Migration skipped or already applied' && node dist/src/main.js"]
+# Skip migrations (already applied) and start server directly
+CMD ["node", "dist/src/main.js"]
