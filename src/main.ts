@@ -18,14 +18,17 @@ async function bootstrap() {
     }),
   );
 
-  // ✅ Middleware UTF-8 para todas las rutas EXCEPTO BullBoard
-  // BullBoard maneja su propio Content-Type, por eso lo excluimos
+  // ✅ Middleware UTF-8 para rutas de API JSON
+  // Excluir BullBoard y Swagger ya que sirven sus propios assets
   app.use((req: Request, res: Response, next: NextFunction) => {
-    // No aplicar a BullBoard (usa sus propios headers)
-    if (req.path.startsWith('/admin/queues')) {
+    // No aplicar a BullBoard ni Swagger (usan sus propios Content-Types)
+    if (
+      req.path.startsWith('/admin/queues') ||
+      req.path.startsWith('/api/docs')
+    ) {
       return next();
     }
-    // Para todas las demás rutas, asegurar UTF-8
+    // Para rutas de API, asegurar UTF-8
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     next();
   });
